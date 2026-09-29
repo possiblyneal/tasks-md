@@ -31,7 +31,7 @@ SQLite store, the Lease and the Change History as a stored record are retired.
 
 It does not decide the file's grammar, which Task attributes survive, the Google
 Tasks mapping, or how existing SQLite data moves. The wayfinding map
-"tasks.md as the store: v1.0" carries those.
+"Map: tasks.md as the store, v1.0" (#92) carries those.
 
 ## Context
 
