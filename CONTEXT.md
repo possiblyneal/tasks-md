@@ -23,15 +23,39 @@ _Avoid_: Audit, provenance, logging
 ### Tracking
 
 **Task**:
-A single piece of work the tracker holds, with its own lifecycle — added, described, completed, declined, reopened, deleted. There is one kind of Task: what a person works on and what an agent works on are the same thing, seen two ways.
+A single piece of work the tracker holds, always in exactly one State. There is one kind of Task: what a person works on and what an agent works on are the same thing, seen two ways.
 _Avoid_: Todo, item, entry, ticket
 
+**State**:
+Where a Task stands: Inbox, Backlog, Doing, Deferred, Done or Declined. A Task moves from any State to any other, and a Subtask has the same six. A Task added without a State named is in Inbox, whoever added it. Done and Declined are the two that **end** a Task. A parent ends only once every Subtask beneath it has ended; a file that says otherwise is read as written and shown as breaking the rule.
+_Avoid_: Status, column, lane, stage
+
+**Inbox**:
+The State of a Task nobody has filed yet. It is where anything added lands, by a person, a dump or an Agent, until a person moves it.
+_Avoid_: Triage, new, unsorted
+
+**Backlog**:
+The State of a Task that is filed and waiting to be started.
+_Avoid_: Todo, queue, planned
+
+**Doing**:
+The State of a Task somebody is working on.
+_Avoid_: In progress, active, started
+
+**Deferred**:
+The State of a Task put aside for now, optionally until a date. When that date passes the Task is moved to Backlog, whatever it was before, and the move is written like any other. With no date it stays Deferred until somebody moves it.
+_Avoid_: Snoozed, hidden, paused, someday
+
+**Done**:
+The State of a Task whose work is finished. It ends the Task.
+_Avoid_: Completed, closed, checked
+
 **Declined**:
-Said of a Task that will not be done. It ends the Task the way completing does, and a Task ends once — a Task that has ended is reopened before it ends the other way. It is not a deletion: a deleted Task is one that should not have been there, and a declined one was there, was looked at, and was refused. Nothing records why. Reopening undoes it, which is what makes declining the way to put a Task aside and keep it.
+The State of a Task that will not be done. It ends the Task the way Done does. It is not a deletion: a deleted Task is one that should not have been there, and a declined one was there, was looked at, and was refused. Nothing records why. Moving it to another State undoes it, which is what makes declining the way to refuse a Task and keep it.
 _Avoid_: Rejected, cancelled, dropped, won't-do
 
 **Deleted**:
-Said of a Task that should not have been there. It is the one thing there is no way back from: reopening a deleted Task is refused, so a Task somebody may want again is declined rather than deleted. It leaves every list read, including the one that shows everything, because it is not one of the states a Task was meant to be in. It is reachable at the entry that deleted it rather than merely kept: a deletion is an appended entry and never an erasure, and any entry reads the Task out as it stood at that position. The Task itself does not come back.
+Said of a Task that should not have been there. It is not a State: it leaves its Repo's file and every read, including the one that shows everything, and only the Repo's history still holds it. A Task somebody may want again is declined rather than deleted.
 _Avoid_: Removed, archived, trashed
 
 **Subtask**:
@@ -63,7 +87,7 @@ A pointer held on a Task to something living outside the tracker — a file path
 _Avoid_: File, upload, document
 
 **Narrowing**:
-What one read of the Tasks asks for: which List, which Tags, what text to match, what order to come back in, and whether the snoozed and the ended are in. It describes a question and never a result, nothing stores one, and every Task that comes back came back because the store answered it — a surface narrows by asking for a narrower list rather than by keeping a filter of its own over the one it has. Naming a second Tag widens it rather than narrowing twice: a Task carrying any one of the named Tags is in the read.
+What one read of the Tasks asks for: which List, which Tags, what text to match, what order to come back in, and whether the Deferred and the ended are in. It describes a question and never a result, nothing stores one, and every Task that comes back came back because the store answered it — a surface narrows by asking for a narrower list rather than by keeping a filter of its own over the one it has. Naming a second Tag widens it rather than narrowing twice: a Task carrying any one of the named Tags is in the read.
 _Avoid_: Filter, query, view, search
 
 **Overdue**:
