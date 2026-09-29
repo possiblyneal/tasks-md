@@ -11,7 +11,7 @@ The area concerned with what work exists and how it is filed. It changes when th
 _Avoid_: Tasks, core, domain
 
 **Scheduling**:
-The area concerned with repetition. It holds rules and dates and never task content — no title, tag, priority, or attachment lives here. Nothing in it runs on a schedule.
+The area concerned with repetition. It holds rules and the dates they produce and never task content — no title, tag, priority, or attachment lives here. A Series is written on a Task, but what it copies forward is Tracking's.
 _Avoid_: Recurrence engine, scheduler, cron
 
 **Change History**:
@@ -105,16 +105,12 @@ _Avoid_: Waiting, dependent, stuck
 ### Scheduling
 
 **Series**:
-A recurrence rule that produces Occurrences. It is edited as one thing, and editing it does not reach a date already Detached.
-_Avoid_: Repeat, schedule, template, recurring task
+A recurrence rule written on a Task, carried forward from one Occurrence to the next. Editing the rule on the current Occurrence edits the Series; deleting it ends the Series and leaves an ordinary Task.
+_Avoid_: Repeat, schedule, template, recurring task, Detached
 
 **Occurrence**:
-One date produced by a Series. It is worked out from the rule whenever something looks, and nothing is stored ahead of time. Stored state exists only for a date someone has acted on — ticked, skipped, or Detached.
+A Task that carries a Series. Only the current one exists: when it ends, Done or Declined, and by whatever route, the next is written as a new Task in Backlog with its Subtasks reset to Backlog, and with the first date the rule produces after both today and the ended one's date as its Deadline. A skipped date is a Declined Occurrence, and the Series goes on.
 _Avoid_: Instance, event, repetition
-
-**Detached**:
-Said of a date lifted out of its Series by being edited, becoming an ordinary Task that the rule no longer produces. Later edits to the Series do not reach it.
-_Avoid_: Override, exception, modified instance
 
 ### Change History
 
@@ -139,5 +135,5 @@ The thing that infers, reached over the network and owned by none of the three c
 _Avoid_: The box, the agent, the AI, the model, the assistant
 
 **Dump**:
-What somebody says a Task is, in their own words and in one box, before any field is filled in. The Broker reads one and answers with the Task it describes, so what comes back is that person's own words sorted into attributes rather than a suggestion of work nobody asked for. A dump amending a Task carries that Task as it stands and comes back whole.
+What somebody says a Task is, in their own words and in one box, before any field is filled in. The Broker reads one and answers with the Task it describes, so what comes back is that person's own words sorted into attributes rather than a suggestion of work nobody asked for. A dump amending a Task carries that Task as it stands and comes back whole. The Broker's answer names a Repo, which a person approves on the form; `todo capture` writes to the Repo its caller names and never to the Broker's guess.
 _Avoid_: Prompt, note, request
