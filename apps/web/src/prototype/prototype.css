@@ -1,0 +1,185 @@
+/* PROTOTYPE — throwaway, issue #99. */
+.p-page {
+  padding: 0.5rem 1rem 6rem;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.p-page button {
+  min-height: 44px;
+}
+.p-dump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.p-dump input {
+  flex: 1;
+  min-width: 12rem;
+  min-height: 44px;
+  font-size: 1rem;
+}
+.p-answer {
+  width: 100%;
+  opacity: 0.8;
+}
+/* C pins the box to the bottom, under the thumb. */
+.p-C .p-dump {
+  position: fixed;
+  bottom: 3.5rem;
+  left: 0;
+  right: 0;
+  padding: 0.5rem 1rem;
+  background: Canvas;
+  border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  z-index: 5;
+}
+.p-C {
+  padding-bottom: 10rem;
+}
+.p-chips,
+.p-states,
+.p-moves {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding: 0.5rem 0;
+}
+[aria-pressed='true'] {
+  outline: 2px solid AccentColor;
+  font-weight: 600;
+}
+.p-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem;
+  border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.p-ended .p-title {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+.p-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+.p-repo {
+  background: color-mix(in srgb, AccentColor 25%, transparent);
+  padding: 0 0.3rem;
+  border-radius: 4px;
+}
+.p-overdue {
+  color: #d33;
+  font-weight: 600;
+}
+/* A — lanes side by side, scroll-snapping one per screen on a phone. */
+.p-lanes {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+.p-lane {
+  flex: 0 0 min(85vw, 18rem);
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-height: 50vh;
+  padding: 0.5rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+}
+.p-lane h3 {
+  margin: 0;
+}
+/* B — nested list. */
+.p-tree {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+.p-tree .p-tree {
+  padding-left: 1.75rem;
+}
+.p-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.2rem 0;
+}
+.p-line input {
+  width: 22px;
+  height: 22px;
+}
+.p-line .p-card {
+  border: none;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+  border-radius: 0;
+}
+.p-repo-section h3 {
+  margin: 1rem 0 0.25rem;
+}
+/* C — flat list. */
+.p-flat {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.p-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(100vw, 26rem);
+  overflow-y: auto;
+  padding: 1rem;
+  box-sizing: border-box;
+  background: Canvas;
+  box-shadow: -4px 0 16px rgb(0 0 0 / 0.3);
+  z-index: 10;
+}
+.p-state {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  white-space: pre-wrap;
+}
+.p-switcher {
+  position: fixed;
+  bottom: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: #111;
+  color: #fff;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.4);
+  z-index: 20;
+  font-size: 0.85rem;
+}
+.p-switcher button {
+  background: none;
+  color: inherit;
+  border: none;
+  font-size: 1.1rem;
+  min-height: 32px !important;
+}
+.p-parents {
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
