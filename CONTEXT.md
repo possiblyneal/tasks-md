@@ -39,8 +39,8 @@ The State of a Task that is filed and waiting to be started.
 _Avoid_: Todo, queue, planned
 
 **Doing**:
-The State of a Task somebody is working on.
-_Avoid_: In progress, active, started
+The State of a Task somebody is working on. Moving a Task to Doing is how anybody, person or Agent, takes it: a Task already in Doing is taken, and moving it to Doing again is refused rather than shared. It never lapses; a Task left in Doing stays there until somebody moves it.
+_Avoid_: In progress, active, started, claimed
 
 **Deferred**:
 The State of a Task put aside for now, optionally until a date. When that date passes the Task is moved to Backlog, whatever it was before, and the move is written like any other. With no date it stays Deferred until somebody moves it. It may carry a Reason.
@@ -91,7 +91,7 @@ A pointer held on a Task to something living outside the tracker — a file path
 _Avoid_: File, upload, document
 
 **Narrowing**:
-What one read of the Tasks asks for: which Repo, which Tags, what text to match, what order to come back in, and whether the Deferred and the ended are in. It describes a question and never a result, nothing stores one, and every Task that comes back came back because the store answered it — a surface narrows by asking for a narrower list rather than by keeping a filter of its own over the one it has. Naming a second Tag widens it rather than narrowing twice: a Task carrying any one of the named Tags is in the read.
+What one read of the Tasks asks for: which Repo, which States, which Tags, what text to match, whether Blocked Tasks are in, and what order to come back in. It describes a question and never a result, nothing stores one, and every Task that comes back came back because the store answered it — a surface narrows by asking for a narrower list rather than by keeping a filter of its own over the one it has. Naming a second Tag widens it rather than narrowing twice: a Task carrying any one of the named Tags is in the read.
 _Avoid_: Filter, query, view, search
 
 **Overdue**:
@@ -125,7 +125,7 @@ An Agent names itself `<harness>/<model>` — `claude-code/claude-opus-5`, `orca
 _Avoid_: User, author, owner
 
 **Agent**:
-An actor that is invoked, acts, and exits. It has no schedule of its own and is not running between invocations. It is named for what it does here, which is write to the tracker under attribution, and not for whether it infers. The Broker infers and is not an Agent.
+An actor that is invoked, acts, and exits. It has no schedule of its own and is not running between invocations. It finds work by reading the Tasks narrowed like anybody else, takes one by moving it to Doing, and files what it discovers along the way into Inbox; nothing is chosen for it. It is named for what it does here, which is write to the tracker under attribution, and not for whether it infers. The Broker infers and is not an Agent.
 _Avoid_: Bot, worker, daemon, service
 
 ### Outside the contexts
