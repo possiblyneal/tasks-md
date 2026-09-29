@@ -43,7 +43,7 @@ The State of a Task somebody is working on.
 _Avoid_: In progress, active, started
 
 **Deferred**:
-The State of a Task put aside for now, optionally until a date. When that date passes the Task is moved to Backlog, whatever it was before, and the move is written like any other. With no date it stays Deferred until somebody moves it.
+The State of a Task put aside for now, optionally until a date. When that date passes the Task is moved to Backlog, whatever it was before, and the move is written like any other. With no date it stays Deferred until somebody moves it. It may carry a Reason.
 _Avoid_: Snoozed, hidden, paused, someday
 
 **Done**:
@@ -51,7 +51,7 @@ The State of a Task whose work is finished. It ends the Task.
 _Avoid_: Completed, closed, checked
 
 **Declined**:
-The State of a Task that will not be done. It ends the Task the way Done does. It is not a deletion: a deleted Task is one that should not have been there, and a declined one was there, was looked at, and was refused. Nothing records why. Moving it to another State undoes it, which is what makes declining the way to refuse a Task and keep it.
+The State of a Task that will not be done. It ends the Task the way Done does. It is not a deletion: a deleted Task is one that should not have been there, and a declined one was there, was looked at, and was refused, optionally with a Reason. Moving it to another State undoes it, which is what makes declining the way to refuse a Task and keep it.
 _Avoid_: Rejected, cancelled, dropped, won't-do
 
 **Deleted**:
@@ -62,21 +62,25 @@ _Avoid_: Removed, archived, trashed
 A Task nested under another Task, to five levels. A Subtask is fixed where it was created: it never moves to a different parent and never leaves the Task it sits under. A top-level Task and everything nested beneath it are written and kept correct as one whole.
 _Avoid_: Child task, step, checklist item
 
-**Collection**:
-Either of the two things a Task is filed under: a List or a Tag. Each is a thing in its own right rather than text on a Task — it is made, named, colored and deleted on its own, it outlives every Task that was filed under it, and deleting one takes nothing off a Task but the filing. The word exists because the two behave identically everywhere except in what somebody means by filing something under one.
-_Avoid_: Group, bucket, folder, category
-
-**List**:
-A Collection a Task belongs to, standing for where the work sits: a house move, a job, a house. A Task may belong to more than one.
-_Avoid_: Project, folder, category, bucket
+**Repo**:
+A folder holding a tasks.md, whether or not it holds code, standing for where the work sits: a house move, a job, a codebase. A Task lives in exactly one Repo.
+_Avoid_: List, project, folder, category, bucket
 
 **Tag**:
-A Collection a Task carries as a label, standing for what the work is about rather than where it sits. It has an identity of its own rather than being the text typed on a Task — it can be renamed or recolored once, and counted across the tracker.
-_Avoid_: Keyword, label, topic
+A label typed on a Task, standing for what the work is about rather than where it sits. It is text and nothing more: it exists while some Task carries it, it is counted across every Repo by reading the Tasks, and renaming one rewrites every Task that carries it. It has no Color.
+_Avoid_: Keyword, label, topic, Collection
 
 **Color**:
-One of nine offered colors a Task, a List or a Tag can carry: red, orange, yellow, green, cyan, blue, violet, magenta, brown. It is named rather than coded, and it is one of the nine or it is none — nothing else is stored, so every surface knows how to paint whatever it reads back.
+One of nine offered colors a Task or a Repo can carry: red, orange, yellow, green, cyan, blue, violet, magenta, brown. It is named rather than coded, and it is one of the nine or it is none — nothing else is stored, so every surface knows how to paint whatever it reads back.
 _Avoid_: Colour, hex, swatch, highlight, theme
+
+**Estimate**:
+How big a Task's work looks: small, medium or large, in that order. It is a size rather than a duration, and it is the only thing the list sorts by when ordered by estimate.
+_Avoid_: Duration, time estimate, points
+
+**Reason**:
+Why a Task was deferred or declined, in somebody's own words. It is optional, it belongs to the Task only while the Task is Deferred or Declined, and moving the Task to any other State clears it.
+_Avoid_: Blocked reason, note, why
 
 **Lease**:
 An exclusive, expiring claim to edit one top-level Task and everything nested under it. Held by any actor before writing, and honoured by every other actor. Symmetric — a person's lease and an agent's lease are the same thing, and neither can tell which kind holds one.
@@ -87,12 +91,16 @@ A pointer held on a Task to something living outside the tracker — a file path
 _Avoid_: File, upload, document
 
 **Narrowing**:
-What one read of the Tasks asks for: which List, which Tags, what text to match, what order to come back in, and whether the Deferred and the ended are in. It describes a question and never a result, nothing stores one, and every Task that comes back came back because the store answered it — a surface narrows by asking for a narrower list rather than by keeping a filter of its own over the one it has. Naming a second Tag widens it rather than narrowing twice: a Task carrying any one of the named Tags is in the read.
+What one read of the Tasks asks for: which Repo, which Tags, what text to match, what order to come back in, and whether the Deferred and the ended are in. It describes a question and never a result, nothing stores one, and every Task that comes back came back because the store answered it — a surface narrows by asking for a narrower list rather than by keeping a filter of its own over the one it has. Naming a second Tag widens it rather than narrowing twice: a Task carrying any one of the named Tags is in the read.
 _Avoid_: Filter, query, view, search
 
 **Overdue**:
 A condition true of a Task whose due date has passed, evaluated whenever something reads it. Nothing records the moment it becomes true.
 _Avoid_: Late, expired
+
+**Blocked**:
+A condition true of a Task while any Task it names as blocking it, in the same Repo, has not ended. Done and Declined both end a blocker. Like Overdue it is evaluated whenever something reads it and is not a State.
+_Avoid_: Waiting, dependent, stuck
 
 ### Scheduling
 
