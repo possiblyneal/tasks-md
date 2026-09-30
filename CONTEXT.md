@@ -15,7 +15,7 @@ The area concerned with repetition. It holds rules and the dates they produce an
 _Avoid_: Recurrence engine, scheduler, cron
 
 **Change History**:
-The area concerned with who did what and in what order, and also the name of the record at its centre. It changes when the arrangement of agents changes, not when the way work is organised does. It stores entries without reading inside them, so a new Task attribute changes Tracking alone.
+The area concerned with who did what and in what order, and also the name of the record at its centre. It changes when the arrangement of agents changes, not when the way work is organised does. It keeps writes without reading inside them, so a new Task attribute changes Tracking alone.
 _Avoid_: Audit, provenance, logging
 
 ## Language
@@ -82,9 +82,9 @@ _Avoid_: Duration, time estimate, points
 Why a Task was deferred or declined, in somebody's own words. It is optional, it belongs to the Task only while the Task is Deferred or Declined, and moving the Task to any other State clears it.
 _Avoid_: Blocked reason, note, why
 
-**Lease**:
-An exclusive, expiring claim to edit one top-level Task and everything nested under it. Held by any actor before writing, and honoured by every other actor. Symmetric — a person's lease and an agent's lease are the same thing, and neither can tell which kind holds one.
-_Avoid_: Lock, claim, reservation, checkout
+**Stale write**:
+A write made against a copy of a top-level Task, and everything nested under it, that has changed since the writer read it. It is refused, and the writer reads again; a write that touches only other Tasks in the same Repo is not stale. Nothing is held before writing, and a person's write and an Agent's are refused alike.
+_Avoid_: Conflict, Lease, lock, claim
 
 **Attachment**:
 A pointer held on a Task to something living outside the tracker — a file path or a web address. The tracker never holds a copy, so it cannot tell whether what is pointed at still exists.
@@ -115,13 +115,13 @@ _Avoid_: Instance, event, repetition
 ### Change History
 
 **Change History**:
-The single ordered sequence of every write in the tracker, kept rather than collapsed. It is the record, not a derived audit trail — current state is what you get by folding it. An actor interested in part of the tracker reads the sequence narrowed to that part.
+The git history of each Repo's tasks.md, one entry per write, each naming its Actor. It is kept rather than collapsed, and it is a record of the file rather than the store: the file is what counts, and the history says how it got that way. A change made to the file by hand, outside `todo`, enters it as a direct edit whose Actor is unknown.
 _Avoid_: Log, audit log, journal, event stream
 
 **Actor**:
-Whoever performed a write — a person or an agent. Every write is attributed; reads are not. Only the Change History knows an Actor as an identity: elsewhere it is an opaque id, so the holder of a Lease can be recognised as the same actor but never named, and never told apart by kind.
+Whoever performed a write: a person, an Agent, or the task server. Every write is attributed; reads are not. Only the Change History knows an Actor as an identity, and nothing else tells Actors apart by kind.
 
-An Agent names itself `<harness>/<model>` — `claude-code/claude-opus-5`, `orca/fable-5-1` — and a person is their bare login, so inside the Change History the slash is what says which wrote a thing and the two halves are what a history log reads. Nowhere else looks at it: an Actor is still opaque everywhere the entries are not. The model half is whatever served the call and is not a list anything here holds: OmniRoute fronts many providers and the set turns over. Nothing validates the shape. An Actor is a string the store writes down and reads back, one that names itself badly or not at all is still an Actor, and the day something refuses a write over its own name is the day attribution has started deciding what may be written.
+An Agent names itself `<harness>/<model>` — `claude-code/claude-opus-5`, `orca/fable-5-1` — and a person is the name they have set for themselves, so inside the Change History the slash is what says which wrote a thing and the two halves are what a history log reads. Nowhere else looks at the slash: an Actor is still opaque everywhere the entries are not. The model half is whatever served the call and is not a list anything here holds: OmniRoute fronts many providers and the set turns over. Nothing validates the shape. An Actor is a string the store writes down and reads back, one that names itself badly or not at all is still an Actor, and the day something refuses a write over its own name is the day attribution has started deciding what may be written. The task server is the Actor for writes nobody asked for: a Deferred Task waking to Backlog, or the next Occurrence of a Series. A change made in Google Tasks is attributed to the person who owns the account.
 _Avoid_: User, author, owner
 
 **Agent**:
