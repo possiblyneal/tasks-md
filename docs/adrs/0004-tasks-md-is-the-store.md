@@ -1,9 +1,9 @@
 ---
 type: Architecture Decision Record
 title: A tasks.md File in Each Repo Is the Store
-description: Every Task lives in exactly one tasks.md at the root of one Repo, git history replaces the Change History, a stale write is refused instead of a Lease being held, and Google Tasks syncs both ways against the files.
+description: Every Task lives in exactly one tasks.md at the root of one Repo, git history replaces the Change History, and a stale write is refused instead of a Lease being held.
 scope: [global, domain]
-tags: [storage, domain-model, concurrency, sync]
+tags: [storage, domain-model, concurrency]
 generated: { by: "agent/claude-opus-5-5", at: "2026-09-29T00:00:00Z" }
 superseded_by:
 status: accepted
@@ -25,12 +25,15 @@ SQLite store, the Lease and the Change History as a stored record are retired.
 - **Agents** prefer the `todo` verbs, which carry the refusal and the commit. A
   direct edit to `tasks.md` is still valid and is picked up.
 - **Discovery** scans root folders on the host running `todo api`. That host's
-  checkouts are the Tasks the web page and Google Tasks see; other clones
+  checkouts are the Tasks the web page sees; other clones
   converge through ordinary git pull and push.
-- **Google Tasks** syncs both ways.
+- **No outside sync.** The web page, laid out for a phone first, is how a
+  person reaches the Tasks away from a keyboard. Google Tasks sync was chosen
+  here and withdrawn on 2026-09-29 (#102): two-way sync with a service that
+  holds two States and one level of Subtasks was judged more trouble than it
+  is worth.
 
-It does not decide the file's grammar, which Task attributes survive, the Google
-Tasks mapping, or how existing SQLite data moves. The wayfinding map
+It does not decide the file's grammar, which Task attributes survive, or how existing SQLite data moves. The wayfinding map
 "Map: tasks.md as the store, v1.0" (#92) carries those.
 
 ## Context
@@ -50,7 +53,7 @@ thing that prevented all three.
 - **The file is a read-only export.** It was rejected because an Agent editing
   its own repo's `tasks.md` is the workflow this exists for.
 - **Last write wins.** It was rejected because three writers touch one file:
-  the web page, an Agent, and Google sync.
+  the web page, an Agent, and the task server.
 
 ## Consequences
 
