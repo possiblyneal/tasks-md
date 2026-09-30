@@ -115,7 +115,7 @@ _Avoid_: Instance, event, repetition
 ### Change History
 
 **Change History**:
-The git history of each Repo's tasks.md, kept apart from the Repo's code history and pushed after every write, one entry per write, each naming its Actor. It is kept rather than collapsed, and it is a record of the file rather than the store: the file is what counts, and the history says how it got that way. A change made to the file by hand, outside `todo`, enters it as a direct edit whose Actor is unknown.
+The git history of each Repo's tasks.md, kept apart from the Repo's code history and pushed after every write, one entry per write, each naming its Actor. It is kept rather than collapsed, and it is a record of the file rather than the store: the file is what counts, and the history says how it got that way. Only `todo` writes the file; it is there to be read. A change that is made by hand anyway, outside `todo`, enters the history as a direct edit whose Actor is unknown, and nothing tries to name one.
 _Avoid_: Log, audit log, journal, event stream
 
 **Actor**:
