@@ -43,7 +43,7 @@ The State of a Task somebody is working on. Moving a Task to Doing is how anybod
 _Avoid_: In progress, active, started, claimed
 
 **Deferred**:
-The State of a Task put aside for now, optionally until a date. When that date passes the Task is moved to Backlog, whatever it was before, and the move is written like any other. With no date it stays Deferred until somebody moves it. It may carry a Reason.
+The State of a Task put aside for now, optionally until a date. When that date passes the Task is moved to Backlog, whatever it was before, and the move is written like any other: by whatever next reads the Tasks, or at midnight if nothing does. A date that passed while nothing was running is caught up then, never skipped. With no date it stays Deferred until somebody moves it. It may carry a Reason.
 _Avoid_: Snoozed, hidden, paused, someday
 
 **Done**:
@@ -109,7 +109,7 @@ A recurrence rule written on a Task, carried forward from one Occurrence to the 
 _Avoid_: Repeat, schedule, template, recurring task, Detached
 
 **Occurrence**:
-A Task that carries a Series. Only the current one exists: when it ends, Done or Declined, and by whatever route, the next is written as a new Task in Backlog with its Subtasks reset to Backlog, and with the first date the rule produces after both today and the ended one's date as its Deadline. A skipped date is a Declined Occurrence, and the Series goes on.
+A Task that carries a Series. Only the current one exists: when it ends, Done or Declined, and by whatever route, the next is written as a new Task in Backlog, and the rule moves to it off the ended one, with its Subtasks reset to Backlog, and with the first date the rule produces after both today and the ended one's date as its Deadline. So an ended Task still carrying a rule is one whose next has not been written yet. A skipped date is a Declined Occurrence, and the Series goes on.
 _Avoid_: Instance, event, repetition
 
 ### Change History
@@ -121,7 +121,7 @@ _Avoid_: Log, audit log, journal, event stream
 **Actor**:
 Whoever performed a write: a person, an Agent, or the task server. Every write is attributed; reads are not. Only the Change History knows an Actor as an identity, and nothing else tells Actors apart by kind.
 
-An Agent names itself `<harness>/<model>` — `claude-code/claude-opus-5`, `orca/fable-5-1` — and a person is the name they have set for themselves, so inside the Change History the slash is what says which wrote a thing and the two halves are what a history log reads. Nowhere else looks at the slash: an Actor is still opaque everywhere the entries are not. The model half is whatever served the call and is not a list anything here holds: OmniRoute fronts many providers and the set turns over. Nothing validates the shape. An Actor is a string the store writes down and reads back, one that names itself badly or not at all is still an Actor, and the day something refuses a write over its own name is the day attribution has started deciding what may be written. The task server is the Actor for writes nobody asked for: a Deferred Task waking to Backlog, or the next Occurrence of a Series.
+An Agent names itself `<harness>/<model>` — `claude-code/claude-opus-5`, `orca/fable-5-1` — and a person is the name they have set for themselves, so inside the Change History the slash is what says which wrote a thing and the two halves are what a history log reads. Nowhere else looks at the slash: an Actor is still opaque everywhere the entries are not. The model half is whatever served the call and is not a list anything here holds: OmniRoute fronts many providers and the set turns over. Nothing validates the shape. An Actor is a string the store writes down and reads back, one that names itself badly or not at all is still an Actor, and the day something refuses a write over its own name is the day attribution has started deciding what may be written. The task server is the Actor for writes nobody asked for: a Deferred Task waking to Backlog, or the next Occurrence of a Series. It is the Actor whichever surface's read happened to bring them about.
 _Avoid_: User, author, owner
 
 **Agent**:
