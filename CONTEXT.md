@@ -63,7 +63,7 @@ A Task nested under another Task, to five levels. A Subtask is fixed where it wa
 _Avoid_: Child task, step, checklist item
 
 **Repo**:
-A folder holding a tasks.md, whether or not it holds code, standing for where the work sits: a house move, a job, a codebase. A Task lives in exactly one Repo.
+A folder holding a tasks.md, whether or not it holds code, standing for where the work sits: a house move, a job, a codebase. A Task lives in exactly one Repo. A Repo's Tasks are the copy in its main checkout on the host serving the board, on whatever branch that checkout has out; `todo` run from a linked worktree reads and writes that copy, and other clones catch up only when somebody pulls.
 _Avoid_: List, project, folder, category, bucket
 
 **Tag**:
