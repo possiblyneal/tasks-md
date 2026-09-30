@@ -27,7 +27,7 @@ A single piece of work the tracker holds, always in exactly one State. There is 
 _Avoid_: Todo, item, entry, ticket
 
 **State**:
-Where a Task stands: Inbox, Backlog, Doing, Deferred, Done or Declined. A Task with no Subtasks moves from any State to any other, and a Subtask has the same six. A parent's State is worked out from its Subtasks and never set: while any has not ended, it is the first of Doing, Backlog, Inbox and Deferred that one of them is in; once all have ended, it is Declined if every one was Declined and Done otherwise. So a parent ends only once every Subtask beneath it has ended. `todo` writes a parent's State into its line like any other; a line that says otherwise is shown as breaking the rule, and the State worked out is the one that counts. A Task added without a State named is in Inbox, whoever added it. Done and Declined are the two that **end** a Task.
+Where a Task stands: Inbox, Backlog, Doing, Deferred, Done or Declined. A Task with no Subtasks moves from any State to any other, and a Subtask has the same six. A parent's State is worked out from its Subtasks and never set: while any has not ended, it is the first of Doing, Backlog, Inbox and Deferred that one of them is in; once all have ended, it is Declined if every one was Declined and Done otherwise. So a parent ends only once every Subtask beneath it has ended, and it ends on the day the last of them did. `todo` writes a parent's State into its line like any other; a line that says otherwise is shown as breaking the rule, and the State worked out is the one that counts. A Task added without a State named is in Inbox, whoever added it. Done and Declined are the two that **end** a Task.
 _Avoid_: Status, column, lane, stage
 
 **Inbox**:
