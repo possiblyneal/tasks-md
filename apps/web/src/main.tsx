@@ -12,3 +12,10 @@ createRoot(root).render(
     <App />
   </StrictMode>,
 )
+
+// Only a build has a worker to register; the dev server serves no `/sw.js`.
+// It is a module because it shares `offline.ts` with the page, which Safari
+// runs from iOS 15.
+if (import.meta.env.PROD) {
+  void navigator.serviceWorker?.register('/sw.js', { type: 'module' })
+}

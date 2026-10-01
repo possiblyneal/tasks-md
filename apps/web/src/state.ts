@@ -3,6 +3,7 @@
 // decides them: `tasks list -json` prints the same shape.
 
 import { refused } from './api'
+import { OFFLINE } from './offline'
 
 /** One of the six, as the word on a title line writes it. */
 export type State =
@@ -137,6 +138,8 @@ export function queryString({
 export type Snapshot = {
   etag: string | null
   board: Board
+  /** The service worker answered with the last board it kept, not the server. */
+  offline: boolean
 }
 
 /**
@@ -166,6 +169,7 @@ export async function fetchState(
   return {
     etag: response.headers.get('ETag'),
     board: (await response.json()) as Board,
+    offline: response.headers.has(OFFLINE),
   }
 }
 

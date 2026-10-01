@@ -47,6 +47,8 @@ export function App() {
   const narrowed = usePoll(queryString(narrowing) ? narrowing : null)
   const board = queryString(narrowing) ? narrowed.board : wide.board
   const error = wide.error ?? narrowed.error
+  // Away from home the board is the last one read, and nothing on it writes.
+  const offline = wide.offline || narrowed.offline
 
   // The address names the open panel, so a panel can be linked to and a
   // reload comes back to it.
@@ -87,6 +89,12 @@ export function App() {
       {/* A failed poll takes nothing off the board: the sentence goes over
           the cards it interrupted. */}
       {error && <p className="message">{error}</p>}
+      {offline && (
+        <p className="message" role="status">
+          Offline: this is the last board read, and nothing can be changed until
+          tasks.lan answers again.
+        </p>
+      )}
       {refusal && <p className="message">{refusal}</p>}
       {board?.errors.map((said) => (
         <p className="message" key={said}>
@@ -153,6 +161,7 @@ export function App() {
                   repo={repo}
                   task={task}
                   today={board?.today ?? ''}
+                  movable={!offline}
                   onOpen={() => open({ id: task.id, repo: repo.name })}
                   onHold={() => setMoving({ repo, task })}
                   onDragStart={(event) => {
@@ -166,7 +175,7 @@ export function App() {
           )
         })}
       </div>
-      {moving && (
+      {moving && !offline && (
         <MoveTo
           title={moving.task.title}
           from={moving.task.state}
@@ -229,6 +238,7 @@ function Card({
   repo,
   task,
   today,
+  movable,
   onOpen,
   onHold,
   onDragStart,
@@ -236,6 +246,7 @@ function Card({
   repo: Repo
   task: Task
   today: string
+  movable: boolean
   onOpen: () => void
   onHold: () => void
   onDragStart: (event: DragEvent) => void
@@ -246,9 +257,9 @@ function Card({
   return (
     <article
       className="card"
-      draggable={DESK}
+      draggable={DESK && movable}
       onDragStart={onDragStart}
-      {...hold}
+      {...(movable ? hold : {})}
       // The Repo's own color, as its preamble names it. A word CSS cannot read
       // draws no edge rather than a wrong one.
       style={repo.color ? { borderInlineStartColor: repo.color } : undefined}
