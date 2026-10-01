@@ -10,6 +10,8 @@
 //
 // Flags says what the board marks a Repo with: not pushed, not backed up, or
 // refusing writes and why.
+//
+// Log and Show read the history back, for a Task's history to be drawn from.
 package history
 
 import (
@@ -38,6 +40,10 @@ const (
 	NotBackedUp = "not backed up"
 )
 
+// DirectEdit is the Actor a hand edit is committed as: nobody the tracker can
+// name.
+const DirectEdit = "direct edit"
+
 // Unready is a Repo refusing writes: its tasks.md holds conflict markers, or
 // its tasks history is mid-merge, mid-rebase or on a detached HEAD. A person
 // clears it by hand, and nothing is written until they do.
@@ -64,7 +70,7 @@ func Write(dir, actor string, change Change) error {
 	if err := ready(dir); err != nil {
 		return err
 	}
-	if err := commit(dir, "commit a direct edit", "direct edit"); err != nil {
+	if err := commit(dir, "commit a direct edit", DirectEdit); err != nil {
 		return err
 	}
 	path := filepath.Join(dir, file)
@@ -127,6 +133,62 @@ func MainCheckout(dir string) string {
 		return dir
 	}
 	return filepath.Join(filepath.Dir(lines[0]), rel)
+}
+
+// Commit is one write in a Repo's tasks history. Subject is what follows
+// `chore(tasks): `, Actor the Generated-By trailer, and Parent the commit
+// before it, "" for the first.
+type Commit struct {
+	Hash, Parent string
+	At           time.Time
+	Actor        string
+	Subject      string
+}
+
+// Log is dir's tasks history, newest first. A Repo never written through has
+// none, and that is no error.
+func Log(dir string) ([]Commit, error) {
+	if _, err := os.Stat(filepath.Join(dir, gitDir)); errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if _, err := tasks(dir, "rev-parse", "-q", "--verify", "HEAD"); err != nil {
+		return nil, nil
+	}
+	// One record a commit, its fields split by NUL and records by RS, so no
+	// subject or trailer can be mistaken for a boundary.
+	out, err := tasks(dir, "log", "--first-parent",
+		"--format=%H%x00%P%x00%aI%x00%s%x00%(trailers:key=Generated-By,valueonly,separator=)%x1e")
+	if err != nil {
+		return nil, err
+	}
+	var log []Commit
+	for record := range strings.SplitSeq(out, "\x1e") {
+		fields := strings.Split(strings.TrimSpace(record), "\x00")
+		if len(fields) != 5 {
+			continue
+		}
+		at, err := time.Parse(time.RFC3339, fields[2])
+		if err != nil {
+			return nil, err
+		}
+		parent, _, _ := strings.Cut(fields[1], " ")
+		log = append(log, Commit{
+			Hash:    fields[0],
+			Parent:  parent,
+			At:      at,
+			Subject: strings.TrimPrefix(fields[3], "chore(tasks): "),
+			Actor:   strings.TrimSpace(fields[4]),
+		})
+	}
+	return log, nil
+}
+
+// Show is tasks.md as the commit left it, and "" for no commit at all.
+func Show(dir, hash string) (string, error) {
+	if hash == "" {
+		return "", nil
+	}
+	return tasks(dir, "show", hash+":"+file)
 }
 
 // lock holds the Repo's folder for one write, so two writers read, change

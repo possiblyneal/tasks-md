@@ -215,6 +215,26 @@ export async function fetchSeries(repo: string, id: string): Promise<Series> {
   return (await response.json()) as Series
 }
 
+/**
+ * One write in a Task's history as `GET /api/tasks/{id}/history` answers it:
+ * when, by which Actor, and the commit's subject. `actor` is `''` for a direct
+ * edit, whose Actor nobody knows.
+ */
+export type Entry = {
+  at: string
+  actor: string
+  subject: string
+}
+
+/** Reads one Task's history, newest first. */
+export async function fetchHistory(repo: string, id: string): Promise<Entry[]> {
+  const response = await fetch(
+    `/api/tasks/${encodeURIComponent(id)}/history?repo=${encodeURIComponent(repo)}`,
+  )
+  if (!response.ok) throw await refused(response)
+  return ((await response.json()) as { entries: Entry[] }).entries
+}
+
 // The values the form offers, mirroring `apps/tasks/src/write/write.go`,
 // which refuses any other.
 

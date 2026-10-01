@@ -80,6 +80,9 @@ func Handler(o Options) http.Handler {
 	mux.HandleFunc("GET /api/tasks/{id}/series", func(w http.ResponseWriter, r *http.Request) {
 		series(o, w, r)
 	})
+	mux.HandleFunc("GET /api/tasks/{id}/history", func(w http.ResponseWriter, r *http.Request) {
+		taskHistory(o, w, r)
+	})
 	mux.HandleFunc("POST /api/tasks/{id}/delete", func(w http.ResponseWriter, r *http.Request) {
 		remove(o, w, r)
 	})
