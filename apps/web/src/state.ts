@@ -174,6 +174,26 @@ export async function fetchState(
   }
 }
 
+/**
+ * A Task's Series as `GET /api/tasks/{id}/series` answers it: the rule as the
+ * file holds it and the next dates it produces from the host's today. The
+ * dates are the server's to work out, because the rule arithmetic lives in
+ * `apps/tasks/src/schedule` and nowhere else.
+ */
+export type Series = {
+  rule: string
+  dates: string[]
+}
+
+/** Reads one Task's Series. */
+export async function fetchSeries(repo: string, id: string): Promise<Series> {
+  const response = await fetch(
+    `/api/tasks/${encodeURIComponent(id)}/series?repo=${encodeURIComponent(repo)}`,
+  )
+  if (!response.ok) throw await refused(response)
+  return (await response.json()) as Series
+}
+
 // The values the form offers, mirroring `apps/tasks/src/write/write.go`,
 // which refuses any other.
 

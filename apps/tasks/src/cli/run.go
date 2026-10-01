@@ -38,6 +38,7 @@ var verbs = []struct {
 	{"move", move},
 	{"delete", remove},
 	{"tags", tags},
+	{"repeat", repeat},
 }
 
 // usage is bare `tasks`: what the binary does and how to reach it. It is an

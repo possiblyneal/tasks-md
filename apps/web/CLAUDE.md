@@ -10,7 +10,7 @@ records why the surface moved off the terminal.
 
 What it holds today: the board, six State lanes of leaf-Task cards over every
 Repo, drawn from `GET /api/state`, with Repo and Tag chips, a search box, a
-sort picker, a panel a card opens into, a move, by dragging a card to a lane at
+sort picker, a panel a card opens into, which shows a Series' next dates, a move, by dragging a card to a lane at
 a desk or holding it on a phone for Move to, and the add/edit form with
 delete. The box and the breakdown are kept unmounted for #123, which brings
 the Broker routes back.
@@ -23,7 +23,7 @@ the Broker routes back.
   `apps/tasks/src/board/board.go`, which is the side that decides them. It
   holds the Narrowing and `queryString`, the one function that writes it as a
   query, the values the form offers (`LEVELS`, `ESTIMATES`, `COLORS`,
-  mirroring `write.go`) and `GET /api/files`'s shapes.
+  mirroring `write.go`), `fetchSeries` and `GET /api/files`'s shapes.
 - `src/write.ts` — the `Draft` the form holds, `draftOf`, and the board's
   writes: `moveTask`, `addTask`, `editTask`, `deleteTask`. `capture`, `ask`,
   `addSubtask` and `breakdown` are the box's and the breakdown's; no route
@@ -32,7 +32,9 @@ the Broker routes back.
   the click after it stopped at the element.
 - `src/MoveTo.tsx` — Move to, the bottom sheet of six States a held card opens.
 - `src/read.ts` — the guard around a read a screen makes for itself, used by the
-  form's file picker.
+  form's file picker and the panel's Series.
+- `src/Series.tsx` — a `series:` attribute in the panel: the rule, and the next
+  dates `GET /api/tasks/{id}/series` works out.
 - `src/App.tsx` — the board: the six lanes, the cards, the moves, the
   problems and flags a Repo has, and which panel is open. It is what
   `main.tsx` mounts.
@@ -48,6 +50,7 @@ the Broker routes back.
   unmounted until #123.
 - `src/main.tsx` — the mount, and nothing else.
 - `src/App.test.tsx`, `src/Narrow.test.tsx`, `src/Panel.test.tsx`,
+  `src/Series.test.tsx`,
   `src/Box.test.tsx`, `src/Sheet.test.tsx`, `src/Breakdown.test.tsx` — the
   components with a grammar. `src/testing.ts` is the board fixture and the
   mocked fetch the board's tests share.
@@ -110,6 +113,8 @@ the Broker routes back.
   form hides or nobody touched is not rewritten; attachments go as `attach`
   and `detach`. A delete sends the version too, and a tree changed since is a
   `409` drawn in the API's words.
+  A `series:` attribute shows its rule and the next dates the server works
+  out; the client does no rule arithmetic.
 - **The address names the open panel.** `?task=<id>&repo=<name>` opens one on
   load, since an id is unique only within its Repo; with no `repo` the first
   Repo holding the id is used. Opening and closing replace the address.
@@ -156,8 +161,8 @@ up` or why it refuses writes, as the read carries them in `flags`.
   unrun and reports `unavailable`, which fails the gate.
 - No `public/`: `scripts/structure` reads a folder under a unit that is neither
   `src/` nor a scoped folder as a domain and requires a `src/` inside it.
-- The screens #119 deleted (Series, collections, activity, the log) are in
-  git history.
+- The screens #119 deleted (collections, activity, the log) are in git
+  history.
 
 ## Verification
 

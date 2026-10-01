@@ -185,6 +185,7 @@ func tags(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	found, errs := board.Discover()
+	pass(found...)
 	switch {
 	case len(words) == 0:
 		read, _ := board.Read(found, board.Narrowing{})
@@ -278,11 +279,20 @@ func actor() string {
 	return "unknown"
 }
 
-// where is the folder a write acts on: the Repo named, or else the nearest
-// tasks.md at or above the working directory. In a linked git worktree that
-// is looked for from the main checkout, since the worktree's own copy of the
-// folder is not where the Repo's Tasks live.
+// where is the folder a write acts on, with the pass run over it first.
 func where(name string) (string, error) {
+	dir, err := nearest(name)
+	if err == nil {
+		write.Pass(now(), dir)
+	}
+	return dir, err
+}
+
+// nearest is the Repo named, or else the nearest tasks.md at or above the
+// working directory. In a linked git worktree that is looked for from the
+// main checkout, since the worktree's own copy of the folder is not where the
+// Repo's Tasks live.
+func nearest(name string) (string, error) {
 	if name != "" {
 		r, err := board.Named(name)
 		return r.Path, err

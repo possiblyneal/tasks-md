@@ -73,6 +73,9 @@ func list(args []string, stdout, stderr io.Writer) int {
 	}
 
 	found, errs := board.Discover()
+	if only, err := board.Only(found, n.Repo); err == nil {
+		pass(only...)
+	}
 	read, err := board.Read(found, n)
 	if err != nil {
 		configErrors(errs, stderr)
@@ -145,6 +148,7 @@ func listRepos(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	found, errs := board.Discover()
+	pass(found...)
 	w := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintf(w, "NAME\tPATH\t%s\tFLAGS\n", strings.ToUpper(strings.Join(stateWords(), "\t")))
 	for _, r := range found {
@@ -182,6 +186,7 @@ func lint(args []string, stdout, stderr io.Writer) int {
 	if len(files) == 0 {
 		found, discovered := board.Discover()
 		errs = discovered
+		pass(found...)
 		for _, r := range found {
 			files = append(files, r.File())
 		}

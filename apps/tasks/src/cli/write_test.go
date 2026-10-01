@@ -191,7 +191,7 @@ func TestAReasonIsHeldOnlyWhileDeferredOrDeclined(t *testing.T) {
 - [ ] Renew the passport | deferred
   - id: pp01
   - created: 2026-09-01
-  - until: 2026-12-01
+  - until: 2099-12-01
   - reason: waiting on photos
 `})
 	repo := filepath.Join(code, "errands")

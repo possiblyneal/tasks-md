@@ -46,7 +46,7 @@ const errands = `# Tasks
 - [ ] Renew the passport | deferred #admin
   - id: pp01
   - created: 2026-09-01
-  - until: 2026-12-01
+  - until: 2099-12-01
   - reason: waiting on photos
   - mood: grim
   - attachment: ~/scans/old.pdf
