@@ -59,6 +59,26 @@ func BriefOf(r board.Repo, id string) (ai.Brief, error) {
 	return ai.Brief{}, NoTask(id)
 }
 
+// WasOf is the one Task in the Repo read as a dump amending it carries it, or
+// NoTask.
+func WasOf(r board.Repo, id string) (*ai.Capture, error) {
+	b, err := BriefOf(r, id)
+	if err != nil {
+		return nil, err
+	}
+	return &ai.Capture{
+		Title:       b.Title,
+		Description: b.Description,
+		Why:         b.Why,
+		Deadline:    b.Deadline,
+		Estimate:    b.Estimate,
+		Priority:    b.Priority,
+		Impact:      b.Impact,
+		Repo:        b.Repo,
+		Tags:        b.Tags,
+	}, nil
+}
+
 func brief(repo string, t board.Task) ai.Brief {
 	attr := func(label string) string {
 		for _, a := range t.Attrs {

@@ -19,6 +19,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { App } from './App'
 import { OFFLINE } from './offline'
 import { answering, asked, BOARD, task } from './testing'
+import * as write from './write'
 
 beforeEach(() => {
   asked.length = 0
@@ -28,6 +29,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
 
 const lane = (name: string) => screen.getByRole('region', { name })
@@ -428,6 +430,44 @@ test('Edit opens the form on the Task and sends what changed', async () => {
       {
         url: '/api/tasks/m3qc',
         body: { repo: 'house-move', version: 'v0', priority: 'high' },
+      },
+    ]),
+  )
+})
+
+test('a dump in a panel amends its Task through the edit form', async () => {
+  vi.spyOn(write, 'capture').mockResolvedValue({
+    repo: 'house-move',
+    title: 'Wrap glassware',
+    why: 'the van comes friday',
+    tags: ['fragile'],
+    description: 'Newspaper first, then the boxes marked G.',
+    deadline: '2026-10-10',
+  })
+  writesAnswering({ status: 200, body: { id: 'm3qc' } })
+  render(<App />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Wrap glassware' }))
+  const panel = within(screen.getByRole('dialog'))
+  fireEvent.change(panel.getByRole('textbox', { name: 'Say what changes' }), {
+    target: { value: 'because the van comes friday' },
+  })
+  fireEvent.click(panel.getByRole('button', { name: 'Read' }))
+  const editing = await waitFor(() => form('Edit the Task'))
+  expect(editing.getByLabelText('Why')).toHaveProperty(
+    'value',
+    'the van comes friday',
+  )
+  fireEvent.click(editing.getByRole('button', { name: 'Save' }))
+
+  await waitFor(() =>
+    expect(writes()).toEqual([
+      {
+        url: '/api/tasks/m3qc',
+        body: {
+          repo: 'house-move',
+          version: 'v0',
+          why: 'the van comes friday',
+        },
       },
     ]),
   )

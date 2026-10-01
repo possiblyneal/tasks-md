@@ -80,6 +80,44 @@ func TestCaptureAnswersADraftWithTheRepoGuessAndWritesNothing(t *testing.T) {
 	unwritten(t, code, files)
 }
 
+// A dump that amends a Task carries that Task as it stands, and the answer is
+// the whole Task as it should end up, in the Task's own Repo.
+func TestCaptureAmendingATaskCarriesItAndAnswersItWhole(t *testing.T) {
+	files := map[string]string{"house-move": houseMove, "work": work}
+	code := homeWith(t, files)
+	told := broker(t, `{"title":"Pack the kitchen","why":"the van comes friday","repo":"work","tags":["kitchen"]}`)
+	h := Handler(Options{Actor: "neal"})
+
+	w := post(t, h, "/api/capture", `{"text": "because the van comes friday", "repo": "house-move", "task": "m3qa"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("POST /api/capture answered %d: %s", w.Code, w.Body.String())
+	}
+	var draft map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &draft); err != nil {
+		t.Fatal(err)
+	}
+	for key, want := range map[string]string{"repo": "house-move", "title": "Pack the kitchen", "why": "the van comes friday"} {
+		if draft[key] != want {
+			t.Errorf("the amended Task's %s = %v, want %q", key, draft[key], want)
+		}
+	}
+	for _, want := range []string{"The task as it stands", `\"title\":\"Pack the kitchen\"`} {
+		if !strings.Contains(*told, want) {
+			t.Errorf("the Broker was told %s, want %q in it", *told, want)
+		}
+	}
+	unwritten(t, code, files)
+
+	for _, body := range []string{
+		`{"text": "later", "repo": "house-move", "task": "zzzz"}`,
+		`{"text": "later", "repo": "nowhere", "task": "m3qa"}`,
+	} {
+		if w := post(t, h, "/api/capture", body); w.Code != http.StatusNotFound {
+			t.Errorf("POST /api/capture %s answered %d, want 404", body, w.Code)
+		}
+	}
+}
+
 func TestAskAnswersAboutTheTasksInViewAndWritesNothing(t *testing.T) {
 	files := map[string]string{"house-move": houseMove, "work": work}
 	code := homeWith(t, files)

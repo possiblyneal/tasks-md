@@ -49,7 +49,12 @@ test('tapping a card opens every attribute it has, read-only', async () => {
   ]) {
     expect(panel.getByText(said)).toBeDefined()
   }
-  expect(panel.queryAllByRole('textbox')).toEqual([])
+  // Nothing it shows is a field: the one textbox is the dump that amends it.
+  expect(
+    panel
+      .queryAllByRole('textbox')
+      .map((box) => box.getAttribute('aria-label')),
+  ).toEqual(['Say what changes'])
   expect(panel.queryAllByRole('checkbox')).toEqual([])
   expect(window.location.search).toBe('?task=m3qc&repo=house-move')
 

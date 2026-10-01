@@ -1,15 +1,18 @@
 // One Task, opened to read: every attribute it carries, its parent with the
 // State the server worked out for it, and its Subtasks. A bottom sheet on a
 // phone and a side panel at a desk, which is CSS's to decide. Edit opens the
-// form on it, and Delete takes two taps. Its history is at the foot.
+// form on it, and Delete takes two taps. Its history is at the foot, and under
+// it a box whose dump amends the Task through the same form.
 
 import { Fragment, useEffect, useState } from 'react'
 
 import { sentence } from './api'
+import { Box } from './Box'
 import { Due } from './Due'
 import { History } from './History'
 import { Series } from './Series'
-import { type Repo, type State, type Task } from './state'
+import { type Repo, type State, type Task, WIDE } from './state'
+import type { Draft } from './write'
 
 /** The order the leaf counts are said in: open first, then ended. */
 const COUNTED: State[] = [
@@ -27,6 +30,7 @@ export function Panel({
   today,
   onOpen,
   onEdit,
+  onAmend,
   onDelete,
   onBreakdown,
   onClose,
@@ -38,6 +42,8 @@ export function Panel({
   today: string
   onOpen: (id: string) => void
   onEdit: () => void
+  /** Opens the form on the Task as a dump amending it was read. */
+  onAmend: (draft: Draft) => void
   /** Deletes the Task, its Subtasks with it, and rejects with a refusal. */
   onDelete: () => Promise<void>
   /** Opens the breakdown on this Task in the panel's place. */
@@ -204,6 +210,15 @@ export function Panel({
         )}
         {task.id && (
           <History repo={repo.name} id={task.id} version={task.version} />
+        )}
+        {task.id && (
+          <Box
+            repos={[repo.name]}
+            narrowing={WIDE}
+            offline={offline}
+            amends={{ repo: repo.name, task }}
+            onDraft={onAmend}
+          />
         )}
       </div>
     </>

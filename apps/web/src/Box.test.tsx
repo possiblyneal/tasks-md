@@ -58,6 +58,45 @@ test('a dump opens a Draft in the Repo the Broker guessed and writes nothing', a
   expect(addTask).not.toHaveBeenCalled()
 })
 
+test('a dump amending a Task carries it and opens it whole, what the Broker left out cleared', async () => {
+  vi.spyOn(write, 'capture').mockResolvedValue({
+    repo: 'house-move',
+    title: 'Wrap glassware',
+    why: 'the van comes friday',
+  })
+  const wrap = BOARD.repos[0]!.tasks[1]!
+  const onDraft = vi.fn()
+  render(
+    <Box
+      repos={['house-move']}
+      narrowing={WIDE}
+      offline={false}
+      amends={{ repo: 'house-move', task: wrap }}
+      onDraft={onDraft}
+    />,
+  )
+
+  // Amending is a dump alone: there is nothing to ask about one Task.
+  expect(screen.queryByRole('button', { name: /switch to/ })).toBeNull()
+  say('because the van comes friday')
+  fireEvent.click(screen.getByRole('button', { name: 'Read' }))
+
+  await vi.waitFor(() =>
+    expect(onDraft).toHaveBeenCalledWith({
+      ...write.draftOf('house-move', wrap),
+      title: 'Wrap glassware',
+      why: 'the van comes friday',
+      tags: [],
+      description: '',
+      deadline: '',
+    }),
+  )
+  expect(write.capture).toHaveBeenCalledWith('because the van comes friday', {
+    repo: 'house-move',
+    task: 'm3qc',
+  })
+})
+
 test('a dump the Broker placed nowhere goes in the first Repo', async () => {
   vi.spyOn(write, 'capture').mockResolvedValue({ repo: '', title: 'Hmm' })
   const onDraft = vi.fn()

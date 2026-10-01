@@ -21,9 +21,15 @@ import (
 // takes, with the Repo the Broker guessed. The attributes come back as said,
 // because the form is where somebody corrects one; a Repo or Tag it named is
 // one offered or nothing.
+//
+// A dump naming a Repo and a Task amends that Task: the Broker is handed it as
+// it stands and answers with the whole of it, and the Repo is the Task's own,
+// because an edit does not move a Task.
 func capture(o Options, w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Text string `json:"text"`
+		Repo string `json:"repo"`
+		Task string `json:"task"`
 	}
 	if err := strict(r, &body); err != nil {
 		fail(w, err)
@@ -40,6 +46,17 @@ func capture(o Options, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	dump := write.DumpOf(text, read, o.now())
+	if body.Task != "" {
+		found, err := board.Named(body.Repo)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		if dump.Was, err = write.WasOf(board.ReadRepo(found), body.Task); err != nil {
+			fail(w, err)
+			return
+		}
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), ai.Patience)
 	defer cancel()
 	said, err := ai.New().Read(ctx, dump)
@@ -50,6 +67,9 @@ func capture(o Options, w http.ResponseWriter, r *http.Request) {
 	repo := ""
 	if guess := write.NamedIn([]string{said.Repo}, dump.Repos); len(guess) == 1 {
 		repo = guess[0]
+	}
+	if dump.Was != nil {
+		repo = dump.Was.Repo
 	}
 	send(w, http.StatusOK, struct {
 		Repo string `json:"repo"`

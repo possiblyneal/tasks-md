@@ -55,7 +55,8 @@ iPhone's home screen as a PWA, and offline shows the last board read.
   summary line, the twelve newest first under it.
 - `src/Due.tsx` — a Deadline marked today or Overdue against the served
   `today`.
-- `src/Box.tsx` — the box: one field with a ＋/? toggle.
+- `src/Box.tsx` — the box: one field with a ＋/? toggle, or a dump alone in a
+  panel, where it amends the Task.
 - `src/Breakdown.tsx` — the breakdown: the Broker's questions, then
   proposals to tick.
 - `src/main.tsx` — the mount, and the service worker's registration in a
@@ -181,6 +182,11 @@ up` or why it refuses writes, as the read carries them in `flags`.
   Broker guessed, or the first Repo when it guessed none offered; only the
   form's Add writes, and that empties the box, while Cancel keeps the words.
   ? asks and draws the answer above the field.
+- **A panel's own box amends its Task.** Its dump goes to `POST /api/capture`
+  with the Task's Repo and id, and the edit form opens on the whole Task the
+  Broker answered: an attribute it read out of dumps and left out is cleared,
+  and one it is never asked about is kept. The edit sends what differs from the
+  Task as read, not from the draft the form opened on.
 - **Break down replaces the panel until Back.** Every proposal starts ticked;
   approving is one `addSubtasks` under the version the breakdown opened on,
   so a tree changed since is a `409` and nothing is half written. A turn that

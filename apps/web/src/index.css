@@ -570,3 +570,9 @@ button.card-title::after {
 .move-to .cancel {
   margin-top: 0.5rem;
 }
+
+/* In a panel, the box that amends its Task stays under the thumb. */
+.panel .box {
+  position: sticky;
+  margin: 1rem -1rem 0;
+}

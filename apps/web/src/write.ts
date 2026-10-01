@@ -172,9 +172,14 @@ export async function deleteTask(
  * Hands a dump to the Broker and gets back the Task it read, filled into the
  * body the add sheet submits. It writes nothing: a dump read and then
  * abandoned leaves nothing behind, so the sheet is the gate.
+ *
+ * A dump that amends a Task names it, and the Task comes back whole.
  */
-export function capture(text: string): Promise<Partial<Draft>> {
-  return send<Partial<Draft>>('POST', '/api/capture', { text })
+export function capture(
+  text: string,
+  amends?: { repo: string; task: string },
+): Promise<Partial<Draft>> {
+  return send<Partial<Draft>>('POST', '/api/capture', { text, ...amends })
 }
 
 /**

@@ -34,11 +34,13 @@ import {
 type Opened = { id: string; repo: string }
 
 /**
- * What the form is open on: a new Task, or one being edited, with its id and
- * its tree's version as they were read when the form opened.
+ * What the form is open on: a new Task, or one being edited, with its id, its
+ * tree's version and the Task itself as they were read when the form opened.
+ * An edit sends what differs from the Task read, which is not the draft when a
+ * dump amended it.
  */
 type Form = { draft: Draft } & (
-  { id: string; version: string } | { id?: never; dumped?: boolean }
+  { id: string; version: string; was: Draft } | { id?: never; dumped?: boolean }
 )
 
 /**
@@ -55,8 +57,9 @@ type Form = { draft: Draft } & (
  * opens it on that Task. The next poll draws what any write did.
  *
  * The box under the board opens the same form on what the Broker read out of
- * a dump, and a panel's Break down opens the breakdown in its place. Neither
- * writes before somebody submits.
+ * a dump, and the box in a panel opens it on that Task as a dump amended it.
+ * A panel's Break down opens the breakdown in its place. None of them writes
+ * before somebody submits.
  */
 export function App() {
   const [narrowing, setNarrowing] = useState(WIDE)
@@ -105,7 +108,7 @@ export function App() {
   const save = async (after: Draft) => {
     if (!form) return
     if (form.id !== undefined) {
-      await editTask(form.id, form.version, form.draft, after)
+      await editTask(form.id, form.version, form.was, after)
     } else {
       await addTask(after)
       if (form.dumped) setSaid((n) => n + 1)
@@ -290,6 +293,15 @@ export function App() {
               draft: draftOf(found.repo.name, found.task),
               id: found.task.id,
               version: found.task.version,
+              was: draftOf(found.repo.name, found.task),
+            })
+          }
+          onAmend={(draft) =>
+            setForm({
+              draft,
+              id: found.task.id,
+              version: found.task.version,
+              was: draftOf(found.repo.name, found.task),
             })
           }
           onDelete={async () => {
