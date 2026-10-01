@@ -181,7 +181,9 @@ up` or why it refuses writes, as the read carries them in `flags`.
   ? asks and draws the answer above the field.
 - **Break down replaces the panel until Back.** Every proposal starts ticked;
   approving is one `addSubtasks` under the version the breakdown opened on,
-  so a tree changed since is a `409` and nothing is half written.
+  so a tree changed since is a `409` and nothing is half written. A turn that
+  fails keeps the Broker's questions and the replies typed into them, so
+  Answer asks again.
 - **A question is asked about the Tasks the read asked for.** `ask` and
   `fetchState` both build their query from a Narrowing through `queryString`,
   so a narrowing added there is on both.
