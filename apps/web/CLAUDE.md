@@ -10,7 +10,7 @@ records why the surface moved off the terminal.
 
 What it holds today: the board, six State lanes of leaf-Task cards over every
 Repo, drawn from `GET /api/state`, with Repo and Tag chips, a search box, a
-sort picker, a panel a card opens into, which shows a Series' next dates, a move, by dragging a card to a lane at
+sort picker, a panel a card opens into, which shows a Series' next dates and the Task's history, a move, by dragging a card to a lane at
 a desk or holding it on a phone for Move to, and the add/edit form with
 delete. The box and the breakdown are kept unmounted for #123, which brings
 the Broker routes back. It installs to an
@@ -24,7 +24,7 @@ iPhone's home screen as a PWA, and offline shows the last board read.
   `apps/tasks/src/board/board.go`, which is the side that decides them. It
   holds the Narrowing and `queryString`, the one function that writes it as a
   query, the values the form offers (`LEVELS`, `ESTIMATES`, `COLORS`,
-  mirroring `write.go`), `fetchSeries` and `GET /api/files`'s shapes.
+  mirroring `write.go`), `fetchSeries`, `fetchHistory` and `GET /api/files`'s shapes.
 - `src/write.ts` — the `Draft` the form holds, `draftOf`, and the board's
   writes: `moveTask`, `addTask`, `editTask`, `deleteTask`. `capture`, `ask`,
   `addSubtask` and `breakdown` are the box's and the breakdown's; no route
@@ -33,9 +33,11 @@ iPhone's home screen as a PWA, and offline shows the last board read.
   the click after it stopped at the element.
 - `src/MoveTo.tsx` — Move to, the bottom sheet of six States a held card opens.
 - `src/read.ts` — the guard around a read a screen makes for itself, used by the
-  form's file picker and the panel's Series.
+  form's file picker and the panel's Series and history.
 - `src/Series.tsx` — a `series:` attribute in the panel: the rule, and the next
   dates `GET /api/tasks/{id}/series` works out.
+- `src/History.tsx` — the panel's history: what `GET /api/tasks/{id}/history`
+  answers, newest first.
 - `src/App.tsx` — the board: the six lanes, the cards, the moves, the
   problems and flags a Repo has, and which panel is open. It is what
   `main.tsx` mounts.
@@ -43,7 +45,7 @@ iPhone's home screen as a PWA, and offline shows the last board read.
   one Narrowing.
 - `src/Narrow.tsx` — the Repo chips, Tag chips, search box and sort picker.
 - `src/Panel.tsx` — the panel: every attribute, the parent with its leaf
-  counts per State, the Subtasks, and Edit and Delete.
+  counts per State, the Subtasks, its history, and Edit and Delete.
 - `src/Sheet.tsx` — the add/edit form, and the file picker for attachments.
 - `src/Due.tsx` — a Deadline marked today or Overdue against the served
   `today`.
@@ -60,7 +62,7 @@ iPhone's home screen as a PWA, and offline shows the last board read.
   `rsvg-convert -w <n> -h <n> icon.svg -o icon-<n>.png` for 180 (the
   `apple-touch-icon` Safari's home screen reads), 192 and 512.
 - `src/App.test.tsx`, `src/Narrow.test.tsx`, `src/Panel.test.tsx`,
-  `src/Series.test.tsx`,
+  `src/Series.test.tsx`, `src/History.test.tsx`,
   `src/Box.test.tsx`, `src/Sheet.test.tsx`, `src/Breakdown.test.tsx` — the
   components with a grammar. `src/testing.ts` is the board fixture and the
   mocked fetch the board's tests share.
@@ -125,6 +127,10 @@ iPhone's home screen as a PWA, and offline shows the last board read.
   form hides or nobody touched is not rewritten; attachments go as `attach`
   and `detach`. A delete sends the version too, and a tree changed since is a
   `409` drawn in the API's words.
+  The panel's foot is the Task's history, newest first, each write with its
+  moment and Actor and `Actor unknown` for a direct edit; which commits are
+  the Task's is the server's to decide. It is read again when the Task's
+  `version` changes, and offline it fails as any other read does.
   A `series:` attribute shows its rule and the next dates the server works
   out; the client does no rule arithmetic.
 - **The address names the open panel.** `?task=<id>&repo=<name>` opens one on

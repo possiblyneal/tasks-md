@@ -1,12 +1,13 @@
 // One Task, opened to read: every attribute it carries, its parent with the
 // State the server worked out for it, and its Subtasks. A bottom sheet on a
 // phone and a side panel at a desk, which is CSS's to decide. Edit opens the
-// form on it, and Delete takes two taps.
+// form on it, and Delete takes two taps. Its history is at the foot.
 
 import { Fragment, useEffect, useState } from 'react'
 
 import { sentence } from './api'
 import { Due } from './Due'
+import { History } from './History'
 import { Series } from './Series'
 import { type Repo, type State, type Task } from './state'
 
@@ -189,6 +190,9 @@ export function Panel({
               ))}
             </ul>
           </>
+        )}
+        {task.id && (
+          <History repo={repo.name} id={task.id} version={task.version} />
         )}
       </div>
     </>
