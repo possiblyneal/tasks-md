@@ -34,7 +34,10 @@ var verbs = []struct {
 	{"repos", listRepos},
 	{"lint", lint},
 	{"add", add},
+	{"edit", edit},
 	{"move", move},
+	{"delete", remove},
+	{"tags", tags},
 }
 
 // usage is bare `tasks`: what the binary does and how to reach it. It is an

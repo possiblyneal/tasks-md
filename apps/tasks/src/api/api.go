@@ -47,8 +47,17 @@ func Handler(o Options) http.Handler {
 	mux.HandleFunc("POST /api/tasks", func(w http.ResponseWriter, r *http.Request) {
 		add(o.Actor, w, r)
 	})
+	mux.HandleFunc("POST /api/tasks/{id}", func(w http.ResponseWriter, r *http.Request) {
+		edit(o.Actor, w, r)
+	})
 	mux.HandleFunc("POST /api/tasks/{id}/move", func(w http.ResponseWriter, r *http.Request) {
 		move(o.Actor, w, r)
+	})
+	mux.HandleFunc("POST /api/tasks/{id}/delete", func(w http.ResponseWriter, r *http.Request) {
+		remove(o.Actor, w, r)
+	})
+	mux.HandleFunc("POST /api/tags/rename", func(w http.ResponseWriter, r *http.Request) {
+		rename(o.Actor, w, r)
 	})
 	// The one route reading outside the Repos. It lists and never opens, and
 	// what it lists is the machine a pointer resolves against rather than the

@@ -66,6 +66,8 @@ type New struct {
 	Color       string   `json:"color,omitempty"`
 	BlockedBy   []string `json:"blockedBy,omitempty"`
 	Reason      string   `json:"reason,omitempty"`
+	Until       string   `json:"until,omitempty"`
+	Attach      []string `json:"attach,omitempty"`
 }
 
 var (
@@ -88,11 +90,10 @@ func Add(dir, actor string, n New) (string, error) {
 		if err != nil {
 			return "", "", err
 		}
+		fill(f)
 		ids := every(f.Tasks)
-		for _, blocker := range n.BlockedBy {
-			if _, ok := ids[blocker]; !ok {
-				return "", "", Invalid{fmt.Errorf("blocked by %s, which is no Task in this Repo", blocker)}
-			}
+		if err := blockers(n.BlockedBy, ids, ""); err != nil {
+			return "", "", err
 		}
 		id = fresh(ids)
 		t := &taskfile.Task{Title: n.Title, State: state, Tags: n.Tags, ID: id, Created: today(), Description: n.Description}
@@ -105,10 +106,12 @@ func Add(dir, actor string, n New) (string, error) {
 			{Label: "why", Value: n.Why},
 			{Label: "acceptance", Value: n.Acceptance},
 			{Label: "blocked by", Value: strings.Join(n.BlockedBy, ", ")},
+			{Label: "until", Value: n.Until},
 			{Label: "reason", Value: n.Reason},
 		} {
 			set(t, a.Label, a.Value)
 		}
+		attach(t, n.Attach, nil)
 		if state.Ended() {
 			set(t, "ended", today())
 			f.Tasks = append(f.Tasks, t)
@@ -137,14 +140,17 @@ func (n New) check() (taskfile.State, error) {
 	if err := reasonFits(n.Reason, state); err != nil {
 		return "", err
 	}
+	if n.Until != "" && state != taskfile.Deferred {
+		return invalid("until is held only while a Task is Deferred, not %s", title(state))
+	}
 	for _, tag := range n.Tags {
 		if !tagForm.MatchString(tag) {
 			return invalid("%q is not a Tag: one word, with no #, | or space", tag)
 		}
 	}
-	if n.Deadline != "" {
-		if _, err := time.Parse(time.DateOnly, n.Deadline); err != nil {
-			return invalid("deadline %q is not a date: want YYYY-MM-DD", n.Deadline)
+	for _, d := range []struct{ name, value string }{{"deadline", n.Deadline}, {"until", n.Until}} {
+		if _, err := time.Parse(time.DateOnly, d.value); d.value != "" && err != nil {
+			return invalid("%s %q is not a date: want YYYY-MM-DD", d.name, d.value)
 		}
 	}
 	for _, c := range []struct {
@@ -160,7 +166,7 @@ func (n New) check() (taskfile.State, error) {
 			return invalid("%s %q is not one of %s", c.name, c.value, strings.Join(c.from, ", "))
 		}
 	}
-	for _, field := range []string{n.Why, n.Acceptance, n.Reason} {
+	for _, field := range append([]string{n.Why, n.Acceptance, n.Reason}, n.Attach...) {
 		if strings.ContainsAny(field, "\r\n") {
 			return invalid("only the description may hold more than one line")
 		}
@@ -181,6 +187,7 @@ func Move(dir, actor, id string, to taskfile.State, reason string) error {
 		if err != nil {
 			return "", "", err
 		}
+		fill(f)
 		path := find(f, id)
 		if path == nil {
 			return "", "", NoTask(id)

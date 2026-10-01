@@ -238,3 +238,26 @@ func TestWriteRewritesAHandEditCanonically(t *testing.T) {
 		t.Errorf("canonical rewrite =\n%s\nwant\n%s", got, header+want)
 	}
 }
+
+func TestVersionFollowsTheWholeTreeAndNothingElse(t *testing.T) {
+	text := "# Tasks\n\n- [ ] Pack | doing\n  - id: m3qa\n  - created: 2026-09-20\n  - [ ] Wrap | doing\n    - id: m3qc\n    - created: 2026-09-20\n- [ ] Van | backlog\n  - id: v9t1\n  - created: 2026-09-21\n"
+	f, _ := Parse(text)
+	pack, van := Version(f.Tasks[0]), Version(f.Tasks[1])
+	if pack == van || pack == "" {
+		t.Fatalf("two trees share version %q", pack)
+	}
+
+	f.Tasks[0].Subtasks[0].Title = "Wrap the glasses"
+	if Version(f.Tasks[0]) == pack {
+		t.Errorf("changing a Subtask left its tree's version alone")
+	}
+	if Version(f.Tasks[1]) != van {
+		t.Errorf("changing one tree changed another's version")
+	}
+
+	// Where a tree sits in the file is not part of it.
+	moved, _ := Parse("# Tasks\n\nA new preamble line.\n\n" + text[len("# Tasks\n\n"):])
+	if Version(moved.Tasks[1]) != van {
+		t.Errorf("a tree's version changed with its line number")
+	}
+}

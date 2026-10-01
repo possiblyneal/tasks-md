@@ -23,6 +23,8 @@ package taskfile
 
 import (
 	"cmp"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"regexp"
 	"slices"
@@ -385,6 +387,17 @@ func Write(f *File) string {
 		write(&b, t, "")
 	}
 	return b.String()
+}
+
+// Version names a top-level Task's tree as it stands: the hash of the tree's
+// canonical text, Subtasks included. A caller that showed a Task hands its
+// tree's version back with a write, and the write is refused when the tree no
+// longer has it. Where the tree sits in the file is not part of it.
+func Version(t *Task) string {
+	var b strings.Builder
+	write(&b, t, "")
+	sum := sha256.Sum256([]byte(b.String()))
+	return hex.EncodeToString(sum[:6])
 }
 
 func write(b *strings.Builder, t *Task, indent string) {

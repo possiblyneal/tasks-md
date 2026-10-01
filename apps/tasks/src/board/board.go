@@ -109,6 +109,9 @@ type Task struct {
 	// across every Repo: by the Sort, then Repo, then place in the file. A
 	// surface drawing Tasks from several Repos together orders them by it.
 	Rank int `json:"rank"`
+	// Version is the version of the top-level tree this Task is in, which a
+	// write hands back to be refused if the tree has changed since.
+	Version string `json:"version"`
 }
 
 func (t Task) attr(label string) string {
@@ -264,13 +267,16 @@ func readRepo(r repos.Repo, sort Sort) Repo {
 	}
 	index(f.Tasks)
 
-	var flatten func(ts []*taskfile.Task, parent string, parents []string)
-	flatten = func(ts []*taskfile.Task, parent string, parents []string) {
+	var flatten func(ts []*taskfile.Task, parent string, parents []string, version string)
+	flatten = func(ts []*taskfile.Task, parent string, parents []string, version string) {
 		ts = slices.Clone(ts)
 		slices.SortStableFunc(ts, func(a, b *taskfile.Task) int {
 			return strings.Compare(sort.key(a.Title, a.Created, a.Attr), sort.key(b.Title, b.Created, b.Attr))
 		})
 		for _, t := range ts {
+			if len(parents) == 0 {
+				version = taskfile.Version(t)
+			}
 			out.Tasks = append(out.Tasks, Task{
 				ID:          t.ID,
 				Title:       t.Title,
@@ -288,11 +294,12 @@ func readRepo(r repos.Repo, sort Sort) Repo {
 					done, known := ended[id]
 					return known && !done
 				}),
+				Version: version,
 			})
-			flatten(t.Subtasks, t.ID, append(slices.Clip(parents), t.Title))
+			flatten(t.Subtasks, t.ID, append(slices.Clip(parents), t.Title), version)
 		}
 	}
-	flatten(f.Tasks, "", []string{})
+	flatten(f.Tasks, "", []string{}, "")
 	return out
 }
 

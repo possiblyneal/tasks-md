@@ -5,10 +5,13 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/user"
 	"path/filepath"
+	"slices"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/possiblyneal/tasks-md/apps/tasks/src/board"
 	"github.com/possiblyneal/tasks-md/apps/tasks/src/history"
@@ -36,6 +39,8 @@ func add(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&n.Color, "color", "", "the color its card is drawn in")
 	fs.Var(&blockers, "blocked-by", "the id of a Task in the same Repo it waits on, repeatable")
 	fs.StringVar(&n.Reason, "reason", "", "why, when it starts Deferred or Declined")
+	fs.StringVar(&n.Until, "until", "", "the date it is deferred until, YYYY-MM-DD, when it starts Deferred")
+	fs.Var((*repeated)(&n.Attach), "attach", "a path or URL it points at, repeatable")
 	words, err := parse(fs, args)
 	if err != nil {
 		return 2
@@ -75,6 +80,146 @@ func move(args []string, _, stderr io.Writer) int {
 		return failed("move", err, stderr)
 	}
 	warn("move", dir, stderr)
+	return 0
+}
+
+// edit is `tasks edit <id> [flags]`: each flag given sets that attribute, an
+// empty one takes it off, and one not given is left alone. -tag and
+// -blocked-by replace the whole set. -version is the tree's version as
+// `tasks list -json` gave it, so an edit made from what was read is refused
+// if the tree changed since.
+func edit(args []string, _, stderr io.Writer) int {
+	fs := flags("edit", stderr)
+	var e write.Edit
+	var tags, blockers repeated
+	repo := fs.String("repo", "", "the Repo the Task is in, rather than the one the command is run in")
+	fs.StringVar(&e.Version, "version", "", "the tree's version as it was read, from tasks list -json")
+	fields := []struct {
+		name, usage string
+		to          **string
+	}{
+		{"title", "its title", &e.Title},
+		{"description", "what it is, at length", &e.Description},
+		{"why", "why it is worth doing", &e.Why},
+		{"acceptance", "how anybody can tell it is done", &e.Acceptance},
+		{"deadline", "the date it is due, YYYY-MM-DD", &e.Deadline},
+		{"priority", "low, med or high", &e.Priority},
+		{"impact", "low, med or high", &e.Impact},
+		{"estimate", "small, medium or large", &e.Estimate},
+		{"color", "the color its card is drawn in", &e.Color},
+		{"reason", "why, while it is Deferred or Declined", &e.Reason},
+		{"until", "the date it is deferred until, YYYY-MM-DD, while it is Deferred", &e.Until},
+	}
+	values := make([]*string, len(fields))
+	for i, f := range fields {
+		values[i] = fs.String(f.name, "", f.usage)
+	}
+	fs.Var(&tags, "tag", "a Tag it carries, repeatable; replaces every Tag, and -tag '' takes them all off")
+	fs.Var(&blockers, "blocked-by", "the id of a Task it waits on, repeatable; replaces every one")
+	fs.Var((*repeated)(&e.Attach), "attach", "a path or URL to point it at, repeatable")
+	fs.Var((*repeated)(&e.Detach), "detach", "a path or URL to stop pointing it at, repeatable")
+	words, err := parse(fs, args)
+	if err != nil {
+		return 2
+	}
+	if len(words) != 1 {
+		fmt.Fprintf(stderr, "tasks edit: want an id, got %q\n", words)
+		return 2
+	}
+	fs.Visit(func(given *flag.Flag) {
+		switch given.Name {
+		case "tag":
+			e.Tags = (*[]string)(&tags)
+		case "blocked-by":
+			e.BlockedBy = (*[]string)(&blockers)
+		}
+		for i, f := range fields {
+			if f.name == given.Name {
+				*f.to = values[i]
+			}
+		}
+	})
+	dir, err := where(*repo)
+	if err != nil {
+		return failed("edit", err, stderr)
+	}
+	if err := write.EditTask(dir, actor(), words[0], e); err != nil {
+		return failed("edit", err, stderr)
+	}
+	warn("edit", dir, stderr)
+	return 0
+}
+
+// remove is `tasks delete <id>`: the Task's block, Subtasks and all, goes from
+// the file, and the tasks history keeps it.
+func remove(args []string, _, stderr io.Writer) int {
+	fs := flags("delete", stderr)
+	repo := fs.String("repo", "", "the Repo the Task is in, rather than the one the command is run in")
+	version := fs.String("version", "", "the tree's version as it was read, from tasks list -json")
+	words, err := parse(fs, args)
+	if err != nil {
+		return 2
+	}
+	if len(words) != 1 {
+		fmt.Fprintf(stderr, "tasks delete: want an id, got %q\n", words)
+		return 2
+	}
+	dir, err := where(*repo)
+	if err != nil {
+		return failed("delete", err, stderr)
+	}
+	if err := write.Delete(dir, actor(), words[0], *version); err != nil {
+		return failed("delete", err, stderr)
+	}
+	warn("delete", dir, stderr)
+	return 0
+}
+
+// tags is `tasks tags`, every Tag with how many Tasks carry it across every
+// Repo, and `tasks tags rename <from> <to>`, which rewrites every carrier as
+// one commit in each Repo holding one.
+func tags(args []string, stdout, stderr io.Writer) int {
+	fs := flags("tags", stderr)
+	words, err := parse(fs, args)
+	if err != nil {
+		return 2
+	}
+	found, errs := board.Discover()
+	switch {
+	case len(words) == 0:
+		read, _ := board.Read(found, board.Narrowing{})
+		counts := map[string]int{}
+		for _, r := range read {
+			for _, t := range r.Tasks {
+				for _, tag := range t.Tags {
+					counts[tag]++
+				}
+			}
+		}
+		w := tabwriter.NewWriter(stdout, 0, 0, 1, ' ', 0)
+		for _, tag := range slices.Sorted(maps.Keys(counts)) {
+			fmt.Fprintf(w, "%s\t%d\n", tag, counts[tag])
+		}
+		_ = w.Flush()
+	case len(words) == 3 && words[0] == "rename":
+		dirs := make([]string, len(found))
+		for i, r := range found {
+			dirs[i] = r.Path
+		}
+		written, err := write.RenameTag(dirs, actor(), words[1], words[2], nil)
+		if err != nil {
+			return failed("tags", err, stderr)
+		}
+		for _, dir := range written {
+			warn("tags", dir, stderr)
+		}
+	default:
+		fmt.Fprintf(stderr, "tasks tags: want nothing, or rename <from> <to>, got %q\n", words)
+		return 2
+	}
+	if configErrors(errs, stderr) {
+		return 1
+	}
 	return 0
 }
 
