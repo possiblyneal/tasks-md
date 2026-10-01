@@ -160,3 +160,41 @@ test('offline, nothing is approved', async () => {
     true,
   )
 })
+
+// A turn the Broker never answered loses nothing: the questions stay with what
+// was typed into them, and asking again sends each answer once.
+test('a failed turn keeps the questions and the replies to retry', async () => {
+  const turn = vi
+    .spyOn(write, 'breakdown')
+    .mockResolvedValueOnce({ questions: ['Which van?'], proposals: [] })
+    .mockRejectedValueOnce(new Error('the broker timed out'))
+    .mockResolvedValueOnce({
+      questions: [],
+      proposals: [{ title: 'Book the big van' }],
+    })
+  render(
+    <Breakdown
+      repo="house-move"
+      task={TASK}
+      offline={false}
+      onBack={() => {}}
+    />,
+  )
+
+  fireEvent.change(await screen.findByLabelText('Which van?'), {
+    target: { value: 'The big one' },
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Answer' }))
+
+  await screen.findByText('the broker timed out')
+  expect(screen.getByLabelText('Which van?')).toHaveProperty(
+    'value',
+    'The big one',
+  )
+
+  fireEvent.click(screen.getByRole('button', { name: 'Answer' }))
+  await screen.findByText('Book the big van')
+  expect(turn).toHaveBeenLastCalledWith('house-move', 't1', [
+    { question: 'Which van?', answer: 'The big one' },
+  ])
+})

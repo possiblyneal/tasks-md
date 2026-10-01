@@ -18,8 +18,9 @@ iPhone's home screen as a PWA, and offline shows the last board read.
 
 ## Ownership
 
-- `src/api.ts` — the fetch plumbing every call shares: one JSON body out and
-  one back, and the one place a failed response becomes an Error.
+- `src/api.ts` — the fetch plumbing every call shares: `get`, one JSON body
+  back, and `send`, one out and one back, and the one place a failed response
+  becomes an Error.
 - `src/state.ts` — the wire shapes and the one read the board makes. It mirrors
   `apps/tasks/src/board/board.go`, which is the side that decides them. It
   holds the Narrowing and `queryString`, the one function that writes it as a
@@ -30,7 +31,10 @@ iPhone's home screen as a PWA, and offline shows the last board read.
   `ask` are the box's; `breakdown` and `addSubtasks` (one write of every
   approved proposal) are the breakdown's.
 - `src/hold.ts` — `useHold`, a long press on touch: the timer, the buzz, and
-  the click after it stopped at the element.
+  the click after it stopped at the element. `buzz` is `navigator.vibrate`
+  where it exists, and elsewhere a hidden `<input type="checkbox" switch>`
+  toggled through its label, which iOS 18 answers with the system haptic; that
+  path is unconfirmed until tried on an iPhone.
 - `src/MoveTo.tsx` — Move to, the bottom sheet of six States a held card opens.
 - `src/read.ts` — the guard around a read a screen makes for itself, used by the
   form's file picker and the panel's Series and history.
@@ -57,8 +61,9 @@ iPhone's home screen as a PWA, and offline shows the last board read.
 - `src/main.tsx` — the mount, and the service worker's registration in a
   build.
 - `src/offline.ts` — what the service worker answers each request with, and
-  `keep`, which holds the page and the files it loads. `OFFLINE` is the header
-  a board read answered from the cache carries, which `fetchState` reads.
+  `keep`, which holds the page and the files it loads, and keeps nothing from
+  an answer that is not ok. `OFFLINE` is the header a board read answered
+  from the cache carries, which `fetchState` reads.
 - `src/sw.ts` — the service worker's wiring, built to `/sw.js`.
 - `src/public/` — Vite's `publicDir`, copied to the build's root unhashed:
   `manifest.json` and the icons. `icon.svg` is the source; the PNGs are
@@ -71,6 +76,7 @@ iPhone's home screen as a PWA, and offline shows the last board read.
   mocked fetch the board's tests share.
 - `src/state.test.ts`, `src/write.test.ts` — what a Narrowing becomes as a
   query, what a read does with a `304` and a refusal, and what a write sends.
+- `src/hold.test.ts` — which way `buzz` asks for the buzz.
 - `src/offline.test.ts` — what the service worker answers, with a Map for the
   Cache and a fetch that reaches the server or does not.
 - `src/index.css` — the whole of the styling. There is no component-level
@@ -152,12 +158,12 @@ iPhone's home screen as a PWA, and offline shows the last board read.
   the Repo's chip is marked; config errors are drawn the same way.
 - **A move is a drag or a hold.** At a desk (`pointer: fine`) a card is
   draggable and a lane is a drop target. On touch a hold of `HOLD_MS` (450ms)
-  buzzes where `navigator.vibrate` exists, suppresses the browser's menu and
-  opens Move to, listing the six States with the card's own disabled; the
-  click the lifted finger sends is stopped at the card, so the hold opens
-  nothing else. A move does not redraw the card itself: the next poll does.
-  A refusal is drawn over the board in the API's words. Move to offers no
-  Reason; `tasks move -reason` does.
+  buzzes, through `navigator.vibrate` or iOS 18's switch haptic, suppresses
+  the browser's menu and opens Move to, listing the six States with the card's
+  own disabled; the click the lifted finger sends is stopped at the card, so
+  the hold opens nothing else. A move does not redraw the card itself: the
+  next poll does. A refusal is drawn over the board in the API's words. Move
+  to offers no Reason; `tasks move -reason` does.
 - **A Repo's flags are drawn beside its problems.** `not pushed`, `not backed
 up` or why it refuses writes, as the read carries them in `flags`.
 - **A 304 is nothing to redraw, not an empty state.** `fetchState` returns
@@ -177,7 +183,9 @@ up` or why it refuses writes, as the read carries them in `flags`.
   ? asks and draws the answer above the field.
 - **Break down replaces the panel until Back.** Every proposal starts ticked;
   approving is one `addSubtasks` under the version the breakdown opened on,
-  so a tree changed since is a `409` and nothing is half written.
+  so a tree changed since is a `409` and nothing is half written. A turn that
+  fails keeps the Broker's questions and the replies typed into them, so
+  Answer asks again.
 - **A question is asked about the Tasks the read asked for.** `ask` and
   `fetchState` both build their query from a Narrowing through `queryString`,
   so a narrowing added there is on both.
@@ -193,9 +201,9 @@ up` or why it refuses writes, as the read carries them in `flags`.
   `role="status"` line and disables every write control: no drag, no hold,
   no Move to, no Add, no Edit, Delete or Break down in the panel, no
   submitting a form already open, and no dump or question in the box; a
-  breakdown already open answers and approves nothing. A write control added later reads the same `offline`. The next
-  poll that
-  reaches the server ends it, with no reload.
+  breakdown already open answers and approves nothing. A write control added
+  later reads the same `offline`. The next poll that reaches the server ends
+  it, with no reload.
 - **The worker is a module, and every chunk the page loads is in
   `index.html`.** `sw.js` imports the chunk it shares with the page, which
   Safari allows from iOS 15. `keep` finds what to hold by reading `/assets/`

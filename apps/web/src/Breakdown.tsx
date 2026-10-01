@@ -44,10 +44,13 @@ export function Breakdown({
   // than left blank, because a turn is a call to the Broker and slow enough to
   // look like nothing happening. Whoever asks for a turn is what says the wait
   // has started: this screen opens waiting, so the first turn has nothing to
-  // set before it is made.
+  // set before it is made. What was said counts as answered only once the
+  // Broker has heard it; a failed turn leaves the questions and replies drawn
+  // for asking again.
   const turn = (said: QA[]) => {
     breakdown(repo, task.id, said)
       .then((step) => {
+        setAnswered(said)
         // Proposals win over questions. `POST /api/breakdown` carries both
         // whole and ranks neither, so the order is this screen's to choose:
         // the two are alternatives, and a turn carrying both is the Broker
@@ -92,8 +95,6 @@ export function Breakdown({
         answer: replies[at] ?? '',
       })),
     ]
-    setAnswered(said)
-    setAsking([])
     setWaiting(true)
     setError(null)
     turn(said)

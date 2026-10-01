@@ -2,7 +2,7 @@
 // it. They mirror `apps/tasks/src/board/board.go`, which is the side that
 // decides them: `tasks list -json` prints the same shape.
 
-import { refused } from './api'
+import { get, refused } from './api'
 import { OFFLINE } from './offline'
 
 /** One of the six, as the word on a title line writes it. */
@@ -208,11 +208,9 @@ export type Series = {
 
 /** Reads one Task's Series. */
 export async function fetchSeries(repo: string, id: string): Promise<Series> {
-  const response = await fetch(
+  return get<Series>(
     `/api/tasks/${encodeURIComponent(id)}/series?repo=${encodeURIComponent(repo)}`,
   )
-  if (!response.ok) throw await refused(response)
-  return (await response.json()) as Series
 }
 
 /**
@@ -228,11 +226,10 @@ export type Entry = {
 
 /** Reads one Task's history, newest first. */
 export async function fetchHistory(repo: string, id: string): Promise<Entry[]> {
-  const response = await fetch(
+  const { entries } = await get<{ entries: Entry[] }>(
     `/api/tasks/${encodeURIComponent(id)}/history?repo=${encodeURIComponent(repo)}`,
   )
-  if (!response.ok) throw await refused(response)
-  return ((await response.json()) as { entries: Entry[] }).entries
+  return entries
 }
 
 // The values the form offers, mirroring `apps/tasks/src/write/write.go`,
@@ -287,7 +284,5 @@ export type Listed = {
 /** Lists one directory, or the listener's root where none is named. */
 export async function fetchFiles(path?: string): Promise<Files> {
   const at = path === undefined ? '' : `?path=${encodeURIComponent(path)}`
-  const response = await fetch(`/api/files${at}`)
-  if (!response.ok) throw await refused(response)
-  return (await response.json()) as Files
+  return get<Files>(`/api/files${at}`)
 }

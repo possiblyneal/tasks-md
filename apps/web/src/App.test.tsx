@@ -312,6 +312,23 @@ test('a card dragged to another lane is moved there', async () => {
   )
 })
 
+// A card let go outside every lane is no longer being dragged, so a text or a
+// file dragged onto a lane afterwards moves nothing.
+test('a drag that ended outside a lane leaves nothing for a later drop', async () => {
+  writesAnswering({ status: 200, body: { id: 'v9t1' } })
+  render(<App />)
+  await screen.findByText('Book the van')
+  const van = within(lane('Backlog')).getByRole('article')
+  const dataTransfer = { setData: vi.fn(), effectAllowed: '', dropEffect: '' }
+
+  fireEvent.dragStart(van, { dataTransfer })
+  fireEvent.dragEnd(van, { dataTransfer })
+  fireEvent.drop(lane('Doing'), { dataTransfer })
+
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  expect(writes()).toEqual([])
+})
+
 test('a move the API refuses is said in its words', async () => {
   writesAnswering({
     status: 409,

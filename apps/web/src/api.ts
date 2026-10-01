@@ -16,6 +16,13 @@ export async function refused(response: Response): Promise<Error> {
   return new Error(sentence)
 }
 
+/** Reads one JSON body from `path`. */
+export async function get<T>(path: string): Promise<T> {
+  const response = await fetch(path)
+  if (!response.ok) throw await refused(response)
+  return (await response.json()) as T
+}
+
 /**
  * Sends one JSON body and reads one back. Every route that takes a body
  * answers with one, so there is no empty-response case to tell apart.

@@ -235,6 +235,21 @@ test('keeping a page keeps what it loads and drops what an older one did', async
   expect(asked).toEqual(['/assets/index-a1.js', '/assets/index-b2.css'])
 })
 
+// The worker installs by keeping whatever `/` answered, which during a deploy
+// can be a 502 that names no assets at all.
+test('a page the server failed to answer keeps nothing and drops nothing', async () => {
+  const cache = shelf()
+  await cache.put(`${ORIGIN}/`, new Response(PAGE))
+  await cache.put(`${ORIGIN}/assets/index-a1.js`, new Response('js'))
+  const { fetcher, asked } = server({})
+
+  await keep(cache, fetcher, new Response('Bad Gateway', { status: 502 }))
+
+  expect(cache.paths()).toEqual(['/', '/assets/index-a1.js'])
+  expect(await (await cache.match(`${ORIGIN}/`))?.text()).toBe(PAGE)
+  expect(asked).toEqual([])
+})
+
 test('an asset already kept is not fetched again', async () => {
   const cache = shelf()
   await cache.put(`${ORIGIN}/assets/index-a1.js`, new Response('js'))

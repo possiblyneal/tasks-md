@@ -1,7 +1,14 @@
 import { afterEach, expect, test, vi } from 'vitest'
 
 import { OFFLINE } from './offline'
-import { fetchState, queryString, WIDE } from './state'
+import {
+  fetchFiles,
+  fetchHistory,
+  fetchSeries,
+  fetchState,
+  queryString,
+  WIDE,
+} from './state'
 
 // What the last call asked for, which is how the conditional request is
 // checked: the ETag only earns its keep if it is actually sent back.
@@ -125,4 +132,41 @@ test('the read asks under the narrowing it was given', async () => {
   await fetchState({ ...WIDE, repo: 'work' }, null)
 
   expect(at).toBe('/api/state?repo=work')
+})
+
+// The panel's and the picker's own reads: each asks where its route is and
+// hands back what came, or the refusal in the API's words.
+
+test('a Series is asked for by id under its Repo', async () => {
+  const series = { rule: 'weekly', dates: ['2026-03-09'] }
+  vi.stubGlobal('fetch', answering(200, series))
+
+  expect(await fetchSeries('house move', 'a/b')).toEqual(series)
+  expect(at).toBe('/api/tasks/a%2Fb/series?repo=house%20move')
+})
+
+test('a history is the entries it answered', async () => {
+  const entry = { at: '2026-03-04T10:00:00Z', actor: '', subject: 'add' }
+  vi.stubGlobal('fetch', answering(200, { entries: [entry] }))
+
+  expect(await fetchHistory('work', 't1')).toEqual([entry])
+  expect(at).toBe('/api/tasks/t1/history?repo=work')
+})
+
+test('files are listed at the path given, or the default with none', async () => {
+  const files = { path: '/home', parent: '/', entries: [] }
+  vi.stubGlobal('fetch', answering(200, files))
+
+  expect(await fetchFiles('/a b')).toEqual(files)
+  expect(at).toBe('/api/files?path=%2Fa%20b')
+  await fetchFiles()
+  expect(at).toBe('/api/files')
+})
+
+test("a refused Series, history or listing says why in the API's words", async () => {
+  vi.stubGlobal('fetch', answering(404, { error: 'no Task t9 in work' }))
+
+  await expect(fetchSeries('work', 't9')).rejects.toThrow('no Task t9 in work')
+  await expect(fetchHistory('work', 't9')).rejects.toThrow('no Task t9 in work')
+  await expect(fetchFiles('/gone')).rejects.toThrow('no Task t9 in work')
 })
