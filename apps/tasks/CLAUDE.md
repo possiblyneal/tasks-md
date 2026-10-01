@@ -18,6 +18,7 @@ It reads through `list`, `repos`, `lint` and `GET /api/state`, and writes throug
 - `src/api/` — `tasks api`: routing, JSON encoding, the status an error takes, the client's files, and the midnight pass. `GET /api/files` is the one route holding a rule of its own.
 - `src/schedule/` — Scheduling's rule arithmetic: parsing a recurrence rule, writing it back, and the dates it produces. `write` is its one caller.
 - `src/ai/` — the Broker client: an OpenAI-compatible HTTP call out to `inference-runtime-broker`. Nothing calls it until #123 brings the Broker routes back.
+- `assets/starter.md` — the `tasks.md` a new Repo starts with: `# Tasks`, `color:` and the one comment telling Agents to use `tasks`. `possiblyneal/template` ships a copy of it as `tasks.md` in its payload, beside `/tasks.md` and `/.tasks.git` in the payload's `.gitignore`; nothing in this binary writes it, since there is no `tasks init`.
 - `deploy/systemd/` — `tasks-api.service`, the `systemd --user` unit that starts `tasks api` on boot. `.unit.json` declares `ships: executable`.
 
 ## Local Contracts
@@ -28,6 +29,7 @@ It reads through `list`, `repos`, `lint` and `GET /api/state`, and writes throug
 - **A write is pushed to branch `tasks` on the code repo's origin, and a failed push fails nothing.** The commit stays, the Repo is flagged `not pushed` until a later write's push goes through, and a folder with no origin is `not backed up`. Nothing merges that branch.
 - **A Repo in a mess refuses writes, exit 3 and `409`.** Conflict markers in tasks.md, or a tasks history mid-merge, mid-rebase or on a detached HEAD. So does a file holding a line a rewrite would drop. A person clears it by hand.
 - **A Repo's flags are on every read.** `flags` on each Repo in `GET /api/state` and `tasks list -json`, the FLAGS column of `tasks repos` (`-` for none), and a warning on stderr after a write that left any. They are worked out afresh from git each time and are part of the ETag.
+- **A Repo made from the template is ready for its first write.** `cli/template_test.go` holds `assets/starter.md` to `tasks lint` clean, to a first `add` keeping its preamble, and to the template's ignore entries being the ones a write looks for, so the write leaves `.gitignore` and the code history untouched. A change to the starter or to those entries is a change to the template's copy too.
 - **Writes to one Repo run one at a time.** `history.Write` holds an exclusive `flock` on the Repo folder across read, change, commit and push; the folder rather than the file, because the file is replaced by a rename.
 - **A write acts on the nearest tasks.md at or above the working directory, or the Repo `-repo` names.** From inside a linked git worktree, that search starts from the same path in the main checkout. The API names the Repo in the body's `repo`.
 - **The Actor is `TASKS_ACTOR`, else the config's `name`, else the login name.** `tasks api` resolves it once when it starts.
