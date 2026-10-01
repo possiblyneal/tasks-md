@@ -171,3 +171,25 @@ func series(o Options, w http.ResponseWriter, r *http.Request) {
 	}
 	send(w, http.StatusOK, s)
 }
+
+// taskHistory is GET /api/tasks/{id}/history?repo=<name>: what happened to the
+// Task, newest first, as `{"entries": [{at, actor, subject}]}`. It writes
+// nothing but the pass.
+func taskHistory(o Options, w http.ResponseWriter, r *http.Request) {
+	repo := r.URL.Query().Get("repo")
+	if repo == "" {
+		fail(w, usage{errors.New("a Task's history is asked for with its Repo in the query's repo")})
+		return
+	}
+	dir, err := named(o, repo)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	entries, err := write.HistoryOf(dir, r.PathValue("id"))
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	send(w, http.StatusOK, map[string][]write.Entry{"entries": entries})
+}
