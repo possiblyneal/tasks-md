@@ -10,7 +10,7 @@
     "default_branch": "main"
   },
   "generation": {
-    "applications": ["todo"],
+    "applications": ["tasks"],
     "visibility": "public",
     "features": {}
   },

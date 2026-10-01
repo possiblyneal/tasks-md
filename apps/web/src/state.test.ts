@@ -155,7 +155,7 @@ test('a list id that needs escaping is escaped', () => {
 
 // The store is what matches the text, so whatever was typed goes out as typed.
 // Trimming or splitting it here would be this side deciding what a search means
-// and then disagreeing with `todo list -search`.
+// and then disagreeing with `tasks list -search`.
 test('searched text is sent as it was typed', () => {
   expect(queryString({ ...WIDE, search: '50% off' })).toBe('?search=50%25+off')
 })

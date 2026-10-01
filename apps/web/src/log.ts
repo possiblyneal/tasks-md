@@ -10,7 +10,7 @@ import type { Entry } from './state'
  * it is the same Actor's own write said three times, so the activity screen
  * drops these or it is two thirds plumbing.
  *
- * This is the one place the client names a kind. `apps/todo/src/store/store.go`
+ * This is the one place the client names a kind. `apps/tasks/src/store/store.go`
  * is where they are defined, and a fourth added there is drawn here rather than
  * hidden, which is the safe direction for the copy to be stale in.
  */

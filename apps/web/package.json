@@ -1,5 +1,5 @@
 {
-  "name": "@todo/web",
+  "name": "@tasks/web",
   "private": true,
   "type": "module",
   "scripts": {

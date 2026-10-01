@@ -448,7 +448,7 @@ function Fields({
  * show what is there.
  *
  * A pointer is text and nothing else. Nothing is uploaded and nothing fetched,
- * so one naming a file names it on the machine `todo api` runs on rather than
+ * so one naming a file names it on the machine `tasks api` runs on rather than
  * on the phone it was typed into.
  *
  * The repeat it refuses is a repeat of the text. The store trims a pointer and
@@ -514,7 +514,7 @@ function Pointers({
 }
 
 /**
- * The machine `todo api` runs on, one directory at a time. It is here because
+ * The machine `tasks api` runs on, one directory at a time. It is here because
  * a pointer naming a file names it on that machine: the browser's own file
  * input answers with a bare filename and no directory, so a file chosen on a
  * phone would be a path the host cannot resolve.
@@ -554,7 +554,7 @@ function Machine({ onPick }: { onPick: (path: string) => void }) {
         </button>
       )}
       {files.entries.map((one) => {
-        // `todo api` is a Unix service, so a join on `/` is the separator its
+        // `tasks api` is a Unix service, so a join on `/` is the separator its
         // paths are spelled with rather than a guess at the host's; every path
         // the route answers is absolute, and the route is the only thing that
         // names a directory here. The root is the one path already ending in

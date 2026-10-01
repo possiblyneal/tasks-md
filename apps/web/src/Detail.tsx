@@ -278,7 +278,7 @@ export function Detail({
  * that adds one.
  *
  * An Attachment is text and nothing else: nothing is uploaded here and nothing
- * is fetched, so a pointer naming a file names it on the machine `todo api`
+ * is fetched, so a pointer naming a file names it on the machine `tasks api`
  * runs on rather than on the phone it was typed into.
  */
 function Attachments({

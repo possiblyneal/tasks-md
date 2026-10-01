@@ -296,7 +296,7 @@ async function read(path: string): Promise<Entry[]> {
 
 /**
  * A Task's Series: the rule as the store wrote it back, and the dates it
- * produces next with what anybody has done to each. `apps/todo/src/api/series.go`
+ * produces next with what anybody has done to each. `apps/tasks/src/api/series.go`
  * is the side that decides the shape.
  *
  * A Task that does not repeat answers `repeats: false` and no dates, which is
@@ -325,8 +325,8 @@ export async function fetchSeries(id: string): Promise<Series> {
 }
 
 /**
- * One directory on the machine `todo api` runs on, as `GET /api/files` lists
- * it. `apps/todo/src/api/files.go` is the side that decides the shape.
+ * One directory on the machine `tasks api` runs on, as `GET /api/files` lists
+ * it. `apps/tasks/src/api/files.go` is the side that decides the shape.
  *
  * It is a read and nothing else: the route lists names and never opens a file,
  * because an Attachment is a pointer and the tracker holds no copy of what it

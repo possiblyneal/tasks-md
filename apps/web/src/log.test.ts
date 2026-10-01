@@ -26,7 +26,7 @@ test('an actor is split on the first slash and nothing else', () => {
 
 test('an actor with no slash is still an actor', () => {
   expect(isAgent('claude-code/opus-5')).toBe(true)
-  // One run with no TODO_ACTOR, or anything appended before the convention
+  // One run with no TASKS_ACTOR, or anything appended before the convention
   // existed. The filter narrows and never hides, so this is not an agent and
   // is still in the unfiltered view.
   expect(isAgent('some-agent')).toBe(false)

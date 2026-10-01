@@ -37,7 +37,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null)
   const [etag, setEtag] = useState<string | null>(null)
   const [screen, setScreen] = useState<Screen>({ name: 'list' })
-  // The list opens on the everyday view, the same one `todo list` prints with
+  // The list opens on the everyday view, the same one `tasks list` prints with
   // no flags. It is held here rather than in the controls because the poll and
   // the question both ask under it.
   const [narrowing, setNarrowing] = useState<Narrowing>(WIDE)

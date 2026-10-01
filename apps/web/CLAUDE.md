@@ -3,9 +3,9 @@
 ## Purpose
 
 The person's surface: a TypeScript browser client, and the only thing a person
-looks at, the TUI and `todo serve` having been deleted at the stage
+looks at, the TUI and `tasks serve` having been deleted at the stage
 `docs/plans/browser-client.md` set aside for it. It reads the tracker over the
-JSON `todo api` serves and builds to static files that same process serves
+JSON `tasks api` serves and builds to static files that same process serves
 beside the JSON, so there is no second process and no CORS.
 `docs/adrs/0003-replace-the-tui-with-a-browser-client.md` records why the
 surface moved off the terminal.
@@ -25,7 +25,7 @@ and adds to this list rather than to the plan.
 - `src/api.ts` — the fetch plumbing every call shares: one JSON body out and
   one back, and the one place a failed response becomes an Error.
 - `src/state.ts` — the wire shapes and the one call that reads them. It mirrors
-  `apps/todo/src/api/state.go`, which is the side that decides them. It also
+  `apps/tasks/src/api/state.go`, which is the side that decides them. It also
   holds the Narrowing and the one function that writes it as a query string,
   which both the list and the question ask under, and `Offered`: the served sets
   a surface picks from, which is the whole of the state bar the Tasks. The
@@ -36,8 +36,8 @@ and adds to this list rather than to the plan.
   calls that reach them, and the client's one copy of the four lifecycle verbs
   and the three Occurrence marks, plus the fourth thing done to a date, which
   is a call of its own because it carries a whole Task. It mirrors
-  `apps/todo/src/api/tasks.go`, `apps/todo/src/api/series.go`,
-  `apps/todo/src/api/collections.go` and `apps/todo/src/api/broker.go`. It also
+  `apps/tasks/src/api/tasks.go`, `apps/tasks/src/api/series.go`,
+  `apps/tasks/src/api/collections.go` and `apps/tasks/src/api/broker.go`. It also
   turns a Task read back into the body that edits it, and takes the difference
   between the memberships a sheet opened on and the ones ticked when it was
   submitted.
@@ -130,8 +130,8 @@ and adds to this list rather than to the plan.
   production has.
 - `.unit.json` — `ships: none`, because what this unit produces is files
   somebody places rather than a program somebody starts. `npm run build` writes
-  them to `dist/`, and on a host they are copied where `todo api -web` is
-  pointed; `apps/todo/deploy/systemd/todo-api.service` is what points it.
+  them to `dist/`, and on a host they are copied where `tasks api -web` is
+  pointed; `apps/tasks/deploy/systemd/tasks-api.service` is what points it.
 
 ## Local Contracts
 
@@ -144,7 +144,7 @@ and adds to this list rather than to the plan.
   screen and the sheet both send the pointer as typed and draw it as text, a web
   address and a file path alike: nothing is fetched and nothing is copied in, which is the
   store's decision from issue #3 rather than a limit of the browser. A path is
-  resolved by whoever runs `todo api`, so one typed on a phone names a file on
+  resolved by whoever runs `tasks api`, so one typed on a phone names a file on
   that host and not on the phone.
 - **The detail screen's attachment field is cleared by the write landing, never
   by the tap.** The pointer typed there survives a refusal, because nothing was
@@ -228,13 +228,13 @@ and adds to this list rather than to the plan.
 - **Narrowing to a List narrows the tree, not just its roots.** The store
   applies the filter to Subtasks too, so a Task open from a List-narrowed read
   shows only the Subtasks in that List. That is `store.Tasks` behaving as
-  `todo list -list` does, and the client draws what it returned rather than
+  `tasks list -list` does, and the client draws what it returned rather than
   reassembling a tree the store did not describe.
 - **Searching is a keystroke and a read, with no timer in between.** Each
   character is a new narrowing, so the poll restarts and the store answers off
   one query; a delay here to decide when typing stopped would be a list that
   lags the box it is searched from. The text goes out as typed, because the
-  store is what matches it and `todo list -search` matches the same way.
+  store is what matches it and `tasks list -search` matches the same way.
 - **The empty list says which of two things happened.** The List, the Tag and
   the search are what take Tasks out of a read this client asks for, so a read
   that came back with nothing under one of the three says the list is narrowed
@@ -346,7 +346,7 @@ and adds to this list rather than to the plan.
 - **The sheet's attachment box is browsed as well as typed into.** The detail
   screen's box is typed into only; the two are issue #78's third disagreement
   rather than a distinction either screen argues for. `Machine` in
-  `Sheet.tsx` walks the machine `todo api` runs on over `GET /api/files`, a
+  `Sheet.tsx` walks the machine `tasks api` runs on over `GET /api/files`, a
   directory at a time, and a file tapped fills the box. It fills and never reads
   back, the rule the deadline's picker follows, and filling is not attaching:
   Attach is still what collects what is in the box. The browser's own file input
@@ -544,7 +544,7 @@ and adds to this list rather than to the plan.
   appended and this client cannot describe one wrongly.
 - **The activity filter narrows and never hides.** The screen opens unfiltered
   and the filter is a toggle, so an Agent that named itself with no slash, one
-  run with no `TODO_ACTOR`, is in the view it opens on.
+  run with no `TASKS_ACTOR`, is in the view it opens on.
 - **The Series is set as one value and the screen keeps no draft of it.** The
   rule is typed whole, for the reason a deadline's box is: a control offering the
   rules it could build would offer fewer than the parser accepts. The field

@@ -1,7 +1,7 @@
 // The wire shapes the write routes take and the two Broker calls, and the
-// calls that reach them. They mirror `apps/todo/src/api/tasks.go`,
-// `apps/todo/src/api/series.go`, `apps/todo/src/api/collections.go` and
-// `apps/todo/src/api/broker.go`, which are the side that decides them.
+// calls that reach them. They mirror `apps/tasks/src/api/tasks.go`,
+// `apps/tasks/src/api/series.go`, `apps/tasks/src/api/collections.go` and
+// `apps/tasks/src/api/broker.go`, which are the side that decides them.
 
 import { send, sentence } from './api'
 import { type Narrowing, queryString, type Task } from './state'
@@ -291,7 +291,7 @@ export type QA = { question: string; answer: string }
 
 /**
  * One Subtask the Broker proposes. Exactly the six `ai.Proposal` carries in
- * `apps/todo/src/ai/ai.go` and no more: a proposal is approved on what was
+ * `apps/tasks/src/ai/ai.go` and no more: a proposal is approved on what was
  * drawn beside its tick, so an attribute this type admits is one the screen
  * has to draw. `TaskBody` is wider and is what the approval goes out as, and
  * typing a proposal as one would let a deadline nobody saw be written by a
@@ -399,7 +399,7 @@ export async function dropCollection(kind: Kind, id: string): Promise<void> {
 
 /**
  * Points a Task at something outside the tracker: a web address, or a path as
- * the machine running `todo api` would read it. Nothing is uploaded and nothing
+ * the machine running `tasks api` would read it. Nothing is uploaded and nothing
  * is copied -- an Attachment is the text and nothing else, so a pointer typed
  * on a phone naming a file on that phone points nowhere anybody can follow.
  */
