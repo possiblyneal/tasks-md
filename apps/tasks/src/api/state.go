@@ -51,9 +51,14 @@ func state(o Options, w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	weeks, err := board.Weekly(found, n, o.now())
+	if err != nil {
+		fail(w, err)
+		return
+	}
 	// The ETag goes on the response that was actually sent, never on an error.
 	w.Header().Set("ETag", tag)
-	send(w, http.StatusOK, board.Of(read, errs))
+	send(w, http.StatusOK, board.Of(read, weeks, errs))
 }
 
 // narrowing reads a Narrowing out of the query. A repeated parameter is a set,

@@ -10,7 +10,7 @@ records why the surface moved off the terminal.
 
 What it holds today: the board, six State lanes of leaf-Task cards over every
 Repo, drawn from `GET /api/state`, with Repo and Tag chips, a search box, a
-sort picker, a panel a card opens into, which shows a Series' next dates, a move, by dragging a card to a lane at
+sort picker, the weekly metrics, a panel a card opens into, which shows a Series' next dates, a move, by dragging a card to a lane at
 a desk or holding it on a phone for Move to, the add/edit form with
 delete, the box pinned under the board that hands a dump or a question to
 the Broker, and Break down in the panel. It installs to an
@@ -45,6 +45,8 @@ iPhone's home screen as a PWA, and offline shows the last board read.
 - `src/Panel.tsx` — the panel: every attribute, the parent with its leaf
   counts per State, the Subtasks, and Edit, Delete and Break down.
 - `src/Sheet.tsx` — the add/edit form, and the file picker for attachments.
+- `src/Metrics.tsx` — the weekly metrics the read carries: this week in the
+  summary line, the twelve newest first under it.
 - `src/Due.tsx` — a Deadline marked today or Overdue against the served
   `today`.
 - `src/Box.tsx` — the box: one field with a ＋/? toggle.
@@ -61,7 +63,7 @@ iPhone's home screen as a PWA, and offline shows the last board read.
   `rsvg-convert -w <n> -h <n> icon.svg -o icon-<n>.png` for 180 (the
   `apple-touch-icon` Safari's home screen reads), 192 and 512.
 - `src/App.test.tsx`, `src/Narrow.test.tsx`, `src/Panel.test.tsx`,
-  `src/Series.test.tsx`,
+  `src/Series.test.tsx`, `src/Metrics.test.tsx`,
   `src/Box.test.tsx`, `src/Sheet.test.tsx`, `src/Breakdown.test.tsx` — the
   components with a grammar. `src/testing.ts` is the board fixture and the
   mocked fetch the board's tests share.
@@ -102,6 +104,11 @@ iPhone's home screen as a PWA, and offline shows the last board read.
   need every Repo, Tag and parent whatever is narrowed; the narrowed read draws
   the lanes and is not made while nothing is narrowed. A narrowed board is
   drawn only under the narrowing it answered.
+- **The metrics are the read's `metrics`, drawn as they come.** Twelve weeks
+  of Added, Done and Declined, counted by the server under the read's Repo and
+  Tags alone, so the board draws the narrowed read's while anything is
+  narrowed and they follow the chips without the client counting anything.
+  This week is in sight; the twelve open under it in a `<details>`.
 - **Today is the host's.** The read's `today` is what a Deadline is due today
   or Overdue against, never the browser's clock.
 - **A card opens a panel.** A bottom sheet 88% of a phone's height,

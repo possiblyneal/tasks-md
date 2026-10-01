@@ -138,22 +138,24 @@ type Repo struct {
 
 // Board is a whole read as `tasks list -json` prints it and GET /api/state
 // answers it: every Repo read, the config errors met finding them, the sorts
-// a read can be ordered by, and the host's local date, which is the day a
-// Deadline is today or Overdue against.
+// a read can be ordered by, the host's local date, which is the day a
+// Deadline is today or Overdue against, and the weekly metrics.
 type Board struct {
-	Repos  []Repo   `json:"repos"`
-	Errors []string `json:"errors"`
-	Sorts  []Sort   `json:"sorts"`
-	Today  string   `json:"today"`
+	Repos   []Repo   `json:"repos"`
+	Errors  []string `json:"errors"`
+	Sorts   []Sort   `json:"sorts"`
+	Today   string   `json:"today"`
+	Metrics []Week   `json:"metrics"`
 }
 
-// Of is the Board holding a read, with errs as its sentences, never null.
-func Of(read []Repo, errs []error) Board {
+// Of is the Board holding a read and its metrics, with errs as its
+// sentences, never null.
+func Of(read []Repo, metrics []Week, errs []error) Board {
 	sentences := make([]string, len(errs))
 	for i, err := range errs {
 		sentences[i] = err.Error()
 	}
-	return Board{Repos: read, Errors: sentences, Sorts: Sorts, Today: Today()}
+	return Board{Repos: read, Errors: sentences, Sorts: Sorts, Today: Today(), Metrics: orEmpty(metrics)}
 }
 
 // Today is the host's local date, written the way a Deadline is.
