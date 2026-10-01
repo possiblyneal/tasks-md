@@ -10,6 +10,32 @@ export const HOLD_MS = 450
 const SLOP_PX = 10
 
 /**
+ * A short buzz. Where `navigator.vibrate` is missing, as on iOS Safari, a
+ * hidden `<input type="checkbox" switch>` is toggled through its label, which
+ * iOS 18 answers with the system haptic. jsdom cannot feel either, so whether
+ * the iPhone buzzes, from a timer rather than the touch itself, needs a device
+ * to confirm.
+ */
+export function buzz() {
+  if (navigator.vibrate) {
+    navigator.vibrate(15)
+    return
+  }
+  const label = document.createElement('label')
+  label.style.display = 'none'
+  label.ariaHidden = 'true'
+  const toggle = document.createElement('input')
+  toggle.type = 'checkbox'
+  toggle.setAttribute('switch', '')
+  label.append(toggle)
+  // In the head, outside the root React listens on, so no handler on the board
+  // sees the click.
+  document.head.append(label)
+  label.click()
+  label.remove()
+}
+
+/**
  * The handlers that make an element answer a held finger by calling `onHold`.
  * The hold buzzes where the phone can, and the click a phone sends when the
  * finger lifts afterwards goes no further than the element, so whatever a tap
@@ -31,7 +57,7 @@ export function useHold(onHold: () => void) {
       cancel()
       timer.current = setTimeout(() => {
         held.current = true
-        navigator.vibrate?.(15)
+        buzz()
         onHold()
       }, HOLD_MS)
     },

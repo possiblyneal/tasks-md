@@ -30,7 +30,10 @@ iPhone's home screen as a PWA, and offline shows the last board read.
   `ask` are the box's; `breakdown` and `addSubtasks` (one write of every
   approved proposal) are the breakdown's.
 - `src/hold.ts` — `useHold`, a long press on touch: the timer, the buzz, and
-  the click after it stopped at the element.
+  the click after it stopped at the element. `buzz` is `navigator.vibrate`
+  where it exists, and elsewhere a hidden `<input type="checkbox" switch>`
+  toggled through its label, which iOS 18 answers with the system haptic; that
+  path is unconfirmed until tried on an iPhone.
 - `src/MoveTo.tsx` — Move to, the bottom sheet of six States a held card opens.
 - `src/read.ts` — the guard around a read a screen makes for itself, used by the
   form's file picker and the panel's Series and history.
@@ -71,6 +74,7 @@ iPhone's home screen as a PWA, and offline shows the last board read.
   mocked fetch the board's tests share.
 - `src/state.test.ts`, `src/write.test.ts` — what a Narrowing becomes as a
   query, what a read does with a `304` and a refusal, and what a write sends.
+- `src/hold.test.ts` — which way `buzz` asks for the buzz.
 - `src/offline.test.ts` — what the service worker answers, with a Map for the
   Cache and a fetch that reaches the server or does not.
 - `src/index.css` — the whole of the styling. There is no component-level
@@ -152,12 +156,12 @@ iPhone's home screen as a PWA, and offline shows the last board read.
   the Repo's chip is marked; config errors are drawn the same way.
 - **A move is a drag or a hold.** At a desk (`pointer: fine`) a card is
   draggable and a lane is a drop target. On touch a hold of `HOLD_MS` (450ms)
-  buzzes where `navigator.vibrate` exists, suppresses the browser's menu and
-  opens Move to, listing the six States with the card's own disabled; the
-  click the lifted finger sends is stopped at the card, so the hold opens
-  nothing else. A move does not redraw the card itself: the next poll does.
-  A refusal is drawn over the board in the API's words. Move to offers no
-  Reason; `tasks move -reason` does.
+  buzzes, through `navigator.vibrate` or iOS 18's switch haptic, suppresses
+  the browser's menu and opens Move to, listing the six States with the card's
+  own disabled; the click the lifted finger sends is stopped at the card, so
+  the hold opens nothing else. A move does not redraw the card itself: the
+  next poll does. A refusal is drawn over the board in the API's words. Move
+  to offers no Reason; `tasks move -reason` does.
 - **A Repo's flags are drawn beside its problems.** `not pushed`, `not backed
 up` or why it refuses writes, as the read carries them in `flags`.
 - **A 304 is nothing to redraw, not an empty state.** `fetchState` returns
