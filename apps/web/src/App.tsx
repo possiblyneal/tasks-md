@@ -1,6 +1,8 @@
 import { type DragEvent, useRef, useState } from 'react'
 
 import { sentence } from './api'
+import { Box } from './Box'
+import { Breakdown } from './Breakdown'
 import { Due } from './Due'
 import { useHold } from './hold'
 import { MoveTo } from './MoveTo'
@@ -35,7 +37,7 @@ type Opened = { id: string; repo: string }
  * its tree's version as they were read when the form opened.
  */
 type Form = { draft: Draft } & (
-  { id: string; version: string } | { id?: never }
+  { id: string; version: string } | { id?: never; dumped?: boolean }
 )
 
 /**
@@ -49,8 +51,11 @@ type Form = { draft: Draft } & (
  *
  * A move is a card dragged to another lane at a desk, or held on a phone and
  * sent through Move to. Add opens the form on a new Task, and a panel's Edit
- * opens it on that Task. The next poll draws what any write did. The box and
- * the breakdown come back with #123.
+ * opens it on that Task. The next poll draws what any write did.
+ *
+ * The box under the board opens the same form on what the Broker read out of
+ * a dump, and a panel's Break down opens the breakdown in its place. Neither
+ * writes before somebody submits.
  */
 export function App() {
   const [narrowing, setNarrowing] = useState(WIDE)
@@ -58,6 +63,10 @@ export function App() {
   const [refusal, setRefusal] = useState<string | null>(null)
   const [moving, setMoving] = useState<Placed | null>(null)
   const [form, setForm] = useState<Form | null>(null)
+  const [breaking, setBreaking] = useState(false)
+  // Bumped once a dump's Task is added, which empties the box. A dump
+  // abandoned in the form keeps its words there to be read again.
+  const [said, setSaid] = useState(0)
   // The card a drag picked up. It is kept here rather than in the drag's own
   // data, which a browser hands back only on the drop.
   const dragged = useRef<Placed | null>(null)
@@ -72,6 +81,7 @@ export function App() {
   // reload comes back to it.
   const open = (next: Opened | null) => {
     setOpened(next)
+    setBreaking(false)
     const query = next
       ? `?${new URLSearchParams({ task: next.id, repo: next.repo })}`
       : ''
@@ -93,8 +103,12 @@ export function App() {
 
   const save = async (after: Draft) => {
     if (!form) return
-    if (form.id) await editTask(form.id, form.version, form.draft, after)
-    else await addTask(after)
+    if (form.id !== undefined) {
+      await editTask(form.id, form.version, form.draft, after)
+    } else {
+      await addTask(after)
+      if (form.dumped) setSaid((n) => n + 1)
+    }
     setForm(null)
   }
 
@@ -212,6 +226,16 @@ export function App() {
           )
         })}
       </div>
+      {/* Before every sheet and dialog, which are drawn over it. */}
+      {wide.board && (
+        <Box
+          key={said}
+          repos={wide.board.repos.map((repo) => repo.name)}
+          narrowing={narrowing}
+          offline={offline}
+          onDraft={(draft) => setForm({ draft, dumped: true })}
+        />
+      )}
       {moving && !offline && (
         <MoveTo
           title={moving.task.title}
@@ -227,7 +251,25 @@ export function App() {
             : `No Task ${opened.id} is on the board.`}
         </p>
       )}
-      {found && wide.board && !form && (
+      {found && wide.board && !form && breaking && (
+        <>
+          <div className="scrim" aria-hidden="true" />
+          <div
+            className="panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Break down the Task"
+          >
+            <Breakdown
+              repo={found.repo.name}
+              task={found.task}
+              offline={offline}
+              onBack={() => setBreaking(false)}
+            />
+          </div>
+        </>
+      )}
+      {found && wide.board && !form && !breaking && (
         <Panel
           repo={found.repo}
           task={found.task}
@@ -244,6 +286,7 @@ export function App() {
             await deleteTask(found.repo.name, found.task.id, found.task.version)
             open(null)
           }}
+          onBreakdown={() => setBreaking(true)}
           onClose={() => open(null)}
           offline={offline}
         />

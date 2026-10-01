@@ -84,9 +84,23 @@ body {
 }
 
 /* The box: the front door, so it is above the list and not behind a tap. */
+/* The box: pinned under the board, within a thumb's reach. */
 .box {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  position: fixed;
+  inset: auto 0 0;
+  padding: 0.5rem 1rem calc(0.5rem + env(safe-area-inset-bottom));
+  border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  background: var(--bg);
+}
+
+.box-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.box-row .dump {
+  flex: 1;
+  min-width: 0;
 }
 
 .dump {
@@ -111,7 +125,9 @@ body {
 }
 
 .answer {
-  margin: 0.75rem 0 0;
+  max-height: 40dvh;
+  overflow-y: auto;
+  margin: 0 0 0.5rem;
   white-space: pre-wrap;
 }
 
@@ -219,7 +235,8 @@ body {
    screen wide, scrolled across with one thumb and snapping to a lane, with the
    next one's edge in view; at a desk all six fit across. */
 .board {
-  padding: 0.5rem 0;
+  /* Room under the last card for the box pinned over it. */
+  padding: 0.5rem 0 6rem;
 }
 
 .problems {

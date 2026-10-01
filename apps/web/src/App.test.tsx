@@ -484,7 +484,7 @@ test('offline, a card can be neither dragged nor held into a move', async () => 
   expect(writes()).toEqual([])
 })
 
-test('offline, nothing adds, edits or deletes', async () => {
+test('offline, nothing adds, edits, deletes or asks the Broker', async () => {
   away(true)
   render(<App />)
   await screen.findByRole('status')
@@ -494,7 +494,8 @@ test('offline, nothing adds, edits or deletes', async () => {
     true,
   )
   fireEvent.click(screen.getByRole('button', { name: 'Wrap glassware' }))
-  for (const name of ['Edit', 'Delete']) {
+  expect(screen.getByLabelText('Say the Task')).toHaveProperty('disabled', true)
+  for (const name of ['Edit', 'Delete', 'Break down']) {
     expect(screen.getByRole('button', { name })).toHaveProperty(
       'disabled',
       true,

@@ -27,6 +27,7 @@ export function Panel({
   onOpen,
   onEdit,
   onDelete,
+  onBreakdown,
   onClose,
   offline,
 }: {
@@ -38,6 +39,8 @@ export function Panel({
   onEdit: () => void
   /** Deletes the Task, its Subtasks with it, and rejects with a refusal. */
   onDelete: () => Promise<void>
+  /** Opens the breakdown on this Task in the panel's place. */
+  onBreakdown: () => void
   onClose: () => void
   /** Offline, the panel still reads but neither edits nor deletes. */
   offline: boolean
@@ -104,6 +107,14 @@ export function Panel({
             onClick={() => void remove()}
           >
             {sure ? 'Delete it and its Subtasks' : 'Delete'}
+          </button>
+          <button
+            type="button"
+            className="control"
+            disabled={offline}
+            onClick={onBreakdown}
+          >
+            Break down
           </button>
           <button type="button" className="control" onClick={onClose}>
             Close

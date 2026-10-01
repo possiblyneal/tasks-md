@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest'
 
 import {
-  addSubtask,
+  addSubtasks,
   addTask,
   ask,
   blank,
@@ -112,14 +112,24 @@ test('an error with no sentence in it still says what happened', async () => {
   )
 })
 
-test('a subtask is written under the task in the path', async () => {
-  vi.stubGlobal('fetch', answering(201, { id: 'task_child' }))
+test('approved Subtasks are one write under the Task in the path', async () => {
+  vi.stubGlobal('fetch', answering(201, { ids: ['c1', 'c2'] }))
 
-  const id = await addSubtask('task_parent', { title: 'Buy the paint' })
+  const ids = await addSubtasks('house-move', 'm3qa', 'v0', [
+    { title: 'Buy the paint' },
+    { title: 'Sand it', estimate: 'small' },
+  ])
 
-  expect(id).toBe('task_child')
-  expect(sent?.url).toBe('/api/tasks/task_parent/subtasks')
-  expect(body()).toEqual({ title: 'Buy the paint' })
+  expect(ids).toEqual(['c1', 'c2'])
+  expect(sent?.url).toBe('/api/tasks/m3qa/subtasks')
+  expect(body()).toEqual({
+    repo: 'house-move',
+    version: 'v0',
+    subtasks: [
+      { title: 'Buy the paint' },
+      { title: 'Sand it', estimate: 'small' },
+    ],
+  })
 })
 
 test('a breakdown turn carries everything already answered', async () => {
@@ -128,12 +138,13 @@ test('a breakdown turn carries everything already answered', async () => {
     answering(200, { proposals: [{ title: 'Sand it' }, { title: 'Sand it' }] }),
   )
 
-  const step = await breakdown('task_abc', [
+  const step = await breakdown('house-move', 'task_abc', [
     { question: 'How big is the fence?', answer: 'Six panels.' },
   ])
 
   expect(sent?.url).toBe('/api/breakdown')
   expect(body()).toEqual({
+    repo: 'house-move',
     task: 'task_abc',
     answers: [{ question: 'How big is the fence?', answer: 'Six panels.' }],
   })

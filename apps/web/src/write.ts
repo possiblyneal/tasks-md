@@ -1,7 +1,6 @@
 // The calls that write. `moveTask`, `addTask`, `editTask` and `deleteTask` are
-// the board's. `capture`, `ask`, `addSubtask` and `breakdown` are the wire
-// shapes the Broker routes took: #123 brings those routes back and mounts
-// `Box` and `Breakdown` again, and they are kept so that work starts from them.
+// the board's; `addSubtasks` is the breakdown's. `capture`, `ask` and
+// `breakdown` are the Broker's, and write nothing.
 
 import { send } from './api'
 import { type Narrowing, queryString, type State, type Task } from './state'
@@ -199,17 +198,22 @@ export async function ask(
   return said.answer
 }
 
-/** Writes one Task under another, which is the same write with a parent. */
-export async function addSubtask(
+/**
+ * Writes the approved proposals under the parent as one write, refused when
+ * the parent's tree has changed since `version` was read. Names what it wrote.
+ */
+export async function addSubtasks(
+  repo: string,
   parent: string,
-  body: Partial<Draft>,
-): Promise<string> {
-  const written = await send<{ id: string }>(
+  version: string,
+  subtasks: Proposal[],
+): Promise<string[]> {
+  const written = await send<{ ids: string[] }>(
     'POST',
     `/api/tasks/${encodeURIComponent(parent)}/subtasks`,
-    body,
+    { repo, version, subtasks },
   )
-  return written.id
+  return written.ids
 }
 
 /** One question the Broker asked and the answer it was given back. */
@@ -217,7 +221,8 @@ export type QA = { question: string; answer: string }
 
 /**
  * One Subtask the Broker proposes. Exactly the six `ai.Proposal` carries in
- * `apps/tasks/src/ai/ai.go` and no more: a proposal is approved on what was
+ * `apps/tasks/src/ai/ai.go` and no more, with what the store would refuse
+ * already dropped by the route: a proposal is approved on what was
  * drawn beside its tick, so an attribute this type admits is one the screen
  * has to draw. `Draft` is wider and is what the approval goes out as, and
  * typing a proposal as one would let a deadline nobody saw be written by a
@@ -240,11 +245,14 @@ export type Step = {
 }
 
 /**
- * One turn of a breakdown. It writes nothing and holds no Lease: the Broker
- * keeps nothing between calls, so every turn carries everything already
- * answered, and an approved proposal is written afterwards by `addSubtask`
- * like any other Subtask.
+ * One turn of a breakdown. It writes nothing: the Broker keeps nothing between
+ * calls, so every turn carries everything already answered, and the approved
+ * proposals are written afterwards by `addSubtasks`.
  */
-export function breakdown(task: string, answers: QA[]): Promise<Step> {
-  return send<Step>('POST', '/api/breakdown', { task, answers })
+export function breakdown(
+  repo: string,
+  task: string,
+  answers: QA[],
+): Promise<Step> {
+  return send<Step>('POST', '/api/breakdown', { repo, task, answers })
 }

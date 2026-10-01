@@ -11,9 +11,9 @@ records why the surface moved off the terminal.
 What it holds today: the board, six State lanes of leaf-Task cards over every
 Repo, drawn from `GET /api/state`, with Repo and Tag chips, a search box, a
 sort picker, a panel a card opens into, which shows a Series' next dates, a move, by dragging a card to a lane at
-a desk or holding it on a phone for Move to, and the add/edit form with
-delete. The box and the breakdown are kept unmounted for #123, which brings
-the Broker routes back. It installs to an
+a desk or holding it on a phone for Move to, the add/edit form with
+delete, the box pinned under the board that hands a dump or a question to
+the Broker, and Break down in the panel. It installs to an
 iPhone's home screen as a PWA, and offline shows the last board read.
 
 ## Ownership
@@ -26,9 +26,9 @@ iPhone's home screen as a PWA, and offline shows the last board read.
   query, the values the form offers (`LEVELS`, `ESTIMATES`, `COLORS`,
   mirroring `write.go`), `fetchSeries` and `GET /api/files`'s shapes.
 - `src/write.ts` — the `Draft` the form holds, `draftOf`, and the board's
-  writes: `moveTask`, `addTask`, `editTask`, `deleteTask`. `capture`, `ask`,
-  `addSubtask` and `breakdown` are the box's and the breakdown's; no route
-  answers those until #123.
+  writes: `moveTask`, `addTask`, `editTask`, `deleteTask`. `capture` and
+  `ask` are the box's; `breakdown` and `addSubtasks` (one write of every
+  approved proposal) are the breakdown's.
 - `src/hold.ts` — `useHold`, a long press on touch: the timer, the buzz, and
   the click after it stopped at the element.
 - `src/MoveTo.tsx` — Move to, the bottom sheet of six States a held card opens.
@@ -43,12 +43,13 @@ iPhone's home screen as a PWA, and offline shows the last board read.
   one Narrowing.
 - `src/Narrow.tsx` — the Repo chips, Tag chips, search box and sort picker.
 - `src/Panel.tsx` — the panel: every attribute, the parent with its leaf
-  counts per State, the Subtasks, and Edit and Delete.
+  counts per State, the Subtasks, and Edit, Delete and Break down.
 - `src/Sheet.tsx` — the add/edit form, and the file picker for attachments.
 - `src/Due.tsx` — a Deadline marked today or Overdue against the served
   `today`.
-- `src/Box.tsx`, `src/Breakdown.tsx` — the dump box and the breakdown,
-  unmounted until #123.
+- `src/Box.tsx` — the box: one field with a ＋/? toggle.
+- `src/Breakdown.tsx` — the breakdown: the Broker's questions, then
+  proposals to tick.
 - `src/main.tsx` — the mount, and the service worker's registration in a
   build.
 - `src/offline.ts` — what the service worker answers each request with, and
@@ -155,6 +156,14 @@ up` or why it refuses writes, as the read carries them in `flags`.
   board it interrupted, and the next poll asks without a tag.
 - **An API error is shown in the API's own words.** The body's sentence is the
   one the CLI would have printed, so it is drawn rather than restated.
+- **The box is pinned under the board and writes nothing.** ＋ reads a dump
+  through `POST /api/capture` and opens the add form on it in the Repo the
+  Broker guessed, or the first Repo when it guessed none offered; only the
+  form's Add writes, and that empties the box, while Cancel keeps the words.
+  ? asks and draws the answer above the field.
+- **Break down replaces the panel until Back.** Every proposal starts ticked;
+  approving is one `addSubtasks` under the version the breakdown opened on,
+  so a tree changed since is a `409` and nothing is half written.
 - **A question is asked about the Tasks the read asked for.** `ask` and
   `fetchState` both build their query from a Narrowing through `queryString`,
   so a narrowing added there is on both.
@@ -168,9 +177,10 @@ up` or why it refuses writes, as the read carries them in `flags`.
   intercepted. The page is offline while the last poll was answered from the
   cache or never reached a server (a `TypeError`); it says so in a
   `role="status"` line and disables every write control: no drag, no hold,
-  no Move to, no Add, no Edit or Delete in the panel. A write control added
-  later (#123's box and Break down) reads the same `offline` and is disabled
-  under it. The next poll that
+  no Move to, no Add, no Edit, Delete or Break down in the panel, and no
+  dump or question in the box; a breakdown already open answers and approves
+  nothing. A write control added later reads the same `offline`. The next
+  poll that
   reaches the server ends it, with no reload.
 - **The worker is a module, and every chunk the page loads is in
   `index.html`.** `sw.js` imports the chunk it shares with the page, which

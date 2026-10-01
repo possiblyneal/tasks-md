@@ -1,138 +1,101 @@
-// The box is the front door. A Task said the way somebody thinks of it, one
-// tap from the list with nothing stacked in front of it, and the question
-// under the same thumb: a dump and a question are both "say a sentence about
-// the list".
-//
-// It is the front door to a Subtask as well, under a Task rather than over the
-// list: the same sentence read the same way, submitted as a Subtask of the
-// Task it was typed under. A question is about a list and there is no list
-// there, so that box asks nothing and draws no Ask.
-//
-// Neither call writes. Handing a dump over opens the add sheet filled in, and
-// submitting that sheet is the only thing that writes; a question is answered
-// as prose over the Tasks in view and appends nothing.
+// The box: one field pinned to the bottom of the board, under the thumb. ＋
+// hands what is typed to the Broker as a dump, and the add form opens filled
+// in with what it read, the Repo it guessed included; ? asks about the Tasks
+// in view and draws the answer above the field. Neither writes: the form's
+// Add is the only thing that does, and a question writes nothing at all.
 
 import { useState } from 'react'
 
-import { Sheet } from './Sheet'
+import { sentence } from './api'
 import type { Narrowing } from './state'
-import { addSubtask, addTask, ask, blank, capture, type Draft } from './write'
+import { ask, blank, capture, type Draft } from './write'
 
-/**
- * Which box this is, and the two are alternatives rather than two switches
- * over one fact. A `Narrowing` makes it the list's: the dump becomes a
- * top-level Task and a question is asked about the Tasks in view. A `parent`
- * makes it that Task's: the dump becomes a Subtask of it and there is no list
- * to ask about. Both at once and neither are the two states the code would
- * have had to describe and nobody could have reached, so the type refuses
- * them.
- */
-type Where =
-  | { narrowing: Narrowing; parent?: never }
-  | { parent: string; narrowing?: never }
+type Mode = 'dump' | 'ask'
 
 export function Box({
   repos,
   narrowing,
-  parent,
+  offline,
+  onDraft,
 }: {
-  /** The Repos the add sheet offers, the first picked until another is. */
+  /** The Repos a guess may name. One it names that is not here is the first. */
   repos: string[]
-} & Where) {
+  /** What the board is narrowed to, which is what a question is about. */
+  narrowing: Narrowing
+  /** Offline, the box neither reads a dump nor asks. */
+  offline: boolean
+  /** Opens the add form on what the Broker read. */
+  onDraft: (draft: Draft) => void
+}) {
+  const [mode, setMode] = useState<Mode>('dump')
   const [text, setText] = useState('')
-  const [working, setWorking] = useState<'' | 'reading' | 'asking'>('')
+  const [waiting, setWaiting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [answer, setAnswer] = useState<string | null>(null)
-  const [draft, setDraft] = useState<Draft | null>(null)
 
-  // The Broker holds nothing between calls, so each of these is one turn and
-  // the whole of it. Both take minutes at worst, which is why the box says
-  // which one it is waiting on rather than only that it is busy.
-  //
-  // What the turn is is handed in rather than branched on here: the question is
-  // only ever asked from the button that knows what it is about, so there is no
-  // arm of this that has to wonder whether there was a list.
-  const hand = async (
-    what: 'reading' | 'asking',
-    turn: (said: string) => Promise<void>,
-  ) => {
-    const said = text.trim()
-    if (said === '' || working !== '') return
-    setWorking(what)
+  const said = text.trim()
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (said === '' || waiting) return
+    setWaiting(true)
     setError(null)
     setAnswer(null)
     try {
-      await turn(said)
+      if (mode === 'ask') {
+        setAnswer(await ask(said, narrowing))
+      } else {
+        const read = await capture(said)
+        const repo =
+          read.repo && repos.includes(read.repo) ? read.repo : (repos[0] ?? '')
+        onDraft({ ...blank(repo), ...read, repo })
+      }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught))
+      setError(sentence(caught))
     } finally {
-      setWorking('')
+      setWaiting(false)
     }
   }
 
-  if (draft) {
-    return (
-      <Sheet
-        draft={draft}
-        repos={repos}
-        existing={false}
-        action="Add"
-        // The dump is done with once the Task is written. Backing out of the
-        // sheet keeps it, because somebody who changed their mind about the
-        // Task has not changed their mind about having typed the sentence.
-        onSubmit={async (body) => {
-          // A dump under a Task is a Subtask of it; the sentence was read the
-          // same way either side of that, and only the route differs.
-          if (parent) await addSubtask(parent, body)
-          else await addTask(body)
-          setDraft(null)
-          setText('')
-        }}
-        onCancel={() => setDraft(null)}
-      />
-    )
-  }
-
+  const asking = mode === 'ask'
   return (
-    <div className="box">
-      <textarea
-        className="dump"
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        placeholder={
-          parent ? 'Say the subtask' : 'Say the task, or ask about the list'
-        }
-        rows={2}
-      />
-      <div className="buttons">
-        <button
-          type="button"
-          onClick={() =>
-            void hand('reading', async (said) =>
-              setDraft({ ...blank(repos[0] ?? ''), ...(await capture(said)) }),
-            )
-          }
-          disabled={working !== '' || text.trim() === ''}
-        >
-          {working === 'reading' ? 'Reading…' : 'Add'}
-        </button>
-        {/* A question is about a list, and a Task's own box has none. */}
-        {narrowing && (
-          <button
-            type="button"
-            onClick={() =>
-              void hand('asking', async (said) =>
-                setAnswer(await ask(said, narrowing)),
-              )
-            }
-            disabled={working !== '' || text.trim() === ''}
-          >
-            {working === 'asking' ? 'Asking…' : 'Ask'}
-          </button>
-        )}
-      </div>
+    <form className="box" onSubmit={(event) => void submit(event)}>
       {error && <p className="message">{error}</p>}
       {answer && <p className="answer">{answer}</p>}
-    </div>
+      <div className="box-row">
+        <button
+          type="button"
+          className="control"
+          aria-label={
+            asking ? 'Asking: switch to adding' : 'Adding: switch to asking'
+          }
+          disabled={offline || waiting}
+          onClick={() => setMode(asking ? 'dump' : 'ask')}
+        >
+          {asking ? '?' : '＋'}
+        </button>
+        <input
+          className="dump"
+          aria-label={asking ? 'Ask about the list' : 'Say the Task'}
+          placeholder={asking ? 'Ask about the list' : 'Say the Task'}
+          value={text}
+          disabled={offline}
+          onChange={(event) => setText(event.target.value)}
+        />
+        <button
+          type="submit"
+          className="control"
+          disabled={offline || waiting || said === ''}
+        >
+          {waiting
+            ? asking
+              ? 'Asking…'
+              : 'Reading…'
+            : asking
+              ? 'Ask'
+              : 'Read'}
+        </button>
+      </div>
+    </form>
   )
 }
