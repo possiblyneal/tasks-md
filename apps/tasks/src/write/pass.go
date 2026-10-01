@@ -114,7 +114,10 @@ func repeat(f *taskfile.File, path []at, today time.Time) string {
 	n := reset(old.task, named, renamed, created)
 	set(n, "deadline", next.Format(time.DateOnly))
 	set(n, "series", rule.String())
+	// Every rule in the tree moves onto the copy, so a Series inside this one is
+	// not repeated a second time under the ended Task.
 	set(old.task, "series", "")
+	walk(old.task.Subtasks, func(t *taskfile.Task) { set(t, "series", "") })
 
 	was := make([]bool, len(path)-1)
 	for i, a := range path[:len(path)-1] {

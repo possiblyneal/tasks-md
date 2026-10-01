@@ -195,3 +195,35 @@ func TestApprovedSubtasksAreOneWriteAsTheListenersActor(t *testing.T) {
 		t.Errorf("Subtasks under a Task not there answered %d, want 404", w.Code)
 	}
 }
+
+func TestSubtasksUnderAnEndedTaskReopenIt(t *testing.T) {
+	code := homeWith(t, map[string]string{"house-move": `# Tasks
+
+- [ ] Book the van | backlog
+  - id: v9t1
+  - created: 2026-09-21
+- [x] Measure the sofa | done
+  - id: s0fa
+  - created: 2026-09-20
+  - ended: 2026-09-22
+`})
+	gitUser(t)
+	h := Handler(Options{Actor: "neal"})
+
+	if w := post(t, h, "/api/tasks/s0fa/subtasks", `{"repo": "house-move", "subtasks": [{"title": "Measure the door"}]}`); w.Code != http.StatusCreated {
+		t.Fatalf("POST /api/tasks/s0fa/subtasks answered %d: %s", w.Code, w.Body.String())
+	}
+	text, err := os.ReadFile(filepath.Join(code, "house-move", "TASKS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := string(text)
+	// The parent is worked out from its one open Subtask, so it reopens and
+	// loses its ended date.
+	if !strings.HasPrefix(file, "# Tasks\n\n- [ ] Book the van | backlog\n  - id: v9t1\n  - created: 2026-09-21\n- [ ] Measure the sofa | inbox\n  - id: s0fa\n  - created: 2026-09-20\n  - [ ] Measure the door | inbox\n") {
+		t.Errorf("TASKS.md =\n%s\nwant the sofa reopened to Inbox with no ended date", file)
+	}
+	if got := task(t, h, "house-move", "s0fa"); got.State != "inbox" {
+		t.Errorf("^s0fa reads back in %s, want inbox", got.State)
+	}
+}

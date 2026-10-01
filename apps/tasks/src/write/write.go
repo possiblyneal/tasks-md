@@ -222,6 +222,10 @@ func AddSubtasks(dir, actor, parent, version string, subtasks []New) ([]string, 
 		fill(f)
 		ids := every(f.Tasks)
 		under := path[len(path)-1].task
+		was := make([]bool, len(path))
+		for i, at := range path {
+			was[i] = at.task.State.Ended()
+		}
 		for i, n := range subtasks {
 			if err := blockers(n.BlockedBy, ids, ""); err != nil {
 				return "", "", err
@@ -230,6 +234,11 @@ func AddSubtasks(dir, actor, parent, version string, subtasks []New) ([]string, 
 			ids[id] = struct{}{}
 			made = append(made, id)
 			place(&under.Subtasks, n.task(states[i], id))
+		}
+		// The parent is worked out afresh, so an ended one reopens and rises.
+		f.Settle()
+		for i := len(path) - 1; i >= 0; i-- {
+			path[i].arrange(was[i])
 		}
 		return taskfile.Write(f), "add ^" + strings.Join(made, " ^") + " under ^" + parent, nil
 	})

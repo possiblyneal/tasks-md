@@ -212,6 +212,35 @@ func TestAHandTickedOccurrenceLongOverdueRepeatsOnceFromToday(t *testing.T) {
 	}
 }
 
+func TestASeriesInsideAnEndedSeriesRepeatsOnlyWithIt(t *testing.T) {
+	code := gitHome(t, map[string]string{"home": `# Tasks
+
+- [x] Clean the house | done
+  - id: cln1
+  - created: 2026-09-01
+  - ended: 2026-09-28
+  - series: every week on mon from 2026-01-05
+  - [x] Descale the kettle | done
+    - id: ket1
+    - created: 2026-09-01
+    - ended: 2026-09-28
+    - series: every month from 2026-01-01
+`})
+	repo := filepath.Join(code, "home")
+	at(t, "2026-10-01")
+
+	listing(t)
+	file := read(t, filepath.Join(repo, "TASKS.md"))
+	// The Subtask comes back once, inside the parent's next Occurrence and
+	// carrying its own rule; the ended pair keeps neither rule and stays Done.
+	if strings.Count(file, "Clean the house") != 2 || strings.Count(file, "Descale the kettle") != 2 || strings.Count(file, "- series: every month") != 1 {
+		t.Errorf("TASKS.md =\n%s\nwant one next Occurrence holding the one Subtask and its rule", file)
+	}
+	if !strings.HasSuffix(file, "- [x] Clean the house | done\n  - id: cln1\n  - created: 2026-09-01\n  - ended: 2026-09-28\n  - [x] Descale the kettle | done\n    - id: ket1\n    - created: 2026-09-01\n    - ended: 2026-09-28\n") {
+		t.Errorf("TASKS.md =\n%s\nwant the ended pair Done with both rules moved off", file)
+	}
+}
+
 func TestARuleThatHasRunOutEndsTheSeries(t *testing.T) {
 	code := gitHome(t, map[string]string{"home": `# Tasks
 
