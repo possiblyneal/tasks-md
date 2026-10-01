@@ -41,7 +41,9 @@ func Repeat(dir, actor, id, rule string) error {
 		if err != nil {
 			return "", "", err
 		}
-		fill(f)
+		if _, err := fill(dir, f); err != nil {
+			return "", "", err
+		}
 		path := find(f, id)
 		if path == nil {
 			return "", "", NoTask(id)

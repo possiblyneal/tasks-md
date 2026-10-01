@@ -101,7 +101,9 @@ func EditTask(dir, actor, id string, e Edit) error {
 			}
 		}
 		attach(t, e.Attach, e.Detach)
-		fill(f)
+		if _, err := fill(dir, f); err != nil {
+			return "", "", err
+		}
 		return taskfile.Write(f), "edit ^" + id + " " + t.Title, nil
 	})
 }
@@ -133,7 +135,9 @@ func Delete(dir, actor, id, version string) error {
 				set(t, "blocked by", strings.Join(kept, ", "))
 			}
 		})
-		fill(f)
+		if _, err := fill(dir, f); err != nil {
+			return "", "", err
+		}
 		return taskfile.Write(f), "delete ^" + id + " " + at.task.Title, nil
 	})
 }
@@ -151,33 +155,37 @@ func RenameTag(dirs []string, actor, from, to string, versions []string) ([]stri
 			return nil, Invalid{fmt.Errorf("%q is not a Tag: one word, with no #, | or space", tag)}
 		}
 	}
-	rename := func(before string) (string, string, error) {
-		f, err := parse(before)
-		if err != nil {
-			return "", "", err
-		}
-		for _, top := range f.Tasks {
-			if carries([]*taskfile.Task{top}, from) && versions != nil && !slices.Contains(versions, taskfile.Version(top)) {
-				return "", "", Refused{fmt.Sprintf("^%s's tree has changed since it was read, so #%s was not renamed; read it again", top.ID, from)}
+	rename := func(dir string) history.Change {
+		return func(before string) (string, string, error) {
+			f, err := parse(before)
+			if err != nil {
+				return "", "", err
 			}
-		}
-		walk(f.Tasks, func(t *taskfile.Task) {
-			if !slices.Contains(t.Tags, from) {
-				return
-			}
-			var tags []string
-			for _, tag := range t.Tags {
-				if tag == from {
-					tag = to
-				}
-				if !slices.Contains(tags, tag) {
-					tags = append(tags, tag)
+			for _, top := range f.Tasks {
+				if carries([]*taskfile.Task{top}, from) && versions != nil && !slices.Contains(versions, taskfile.Version(top)) {
+					return "", "", Refused{fmt.Sprintf("^%s's tree has changed since it was read, so #%s was not renamed; read it again", top.ID, from)}
 				}
 			}
-			t.Tags = tags
-		})
-		fill(f)
-		return taskfile.Write(f), "rename #" + from + " to #" + to, nil
+			walk(f.Tasks, func(t *taskfile.Task) {
+				if !slices.Contains(t.Tags, from) {
+					return
+				}
+				var tags []string
+				for _, tag := range t.Tags {
+					if tag == from {
+						tag = to
+					}
+					if !slices.Contains(tags, tag) {
+						tags = append(tags, tag)
+					}
+				}
+				t.Tags = tags
+			})
+			if _, err := fill(dir, f); err != nil {
+				return "", "", err
+			}
+			return taskfile.Write(f), "rename #" + from + " to #" + to, nil
+		}
 	}
 	// A Repo carrying no Task with the Tag is left alone, broken or not.
 	var carrying []string
@@ -190,13 +198,13 @@ func RenameTag(dirs []string, actor, from, to string, versions []string) ([]stri
 		if !carries(f.Tasks, from) {
 			continue
 		}
-		if _, _, err := rename(string(text)); err != nil {
+		if _, _, err := rename(dir)(string(text)); err != nil {
 			return nil, err
 		}
 		carrying = append(carrying, dir)
 	}
 	for i, dir := range carrying {
-		if err := history.Write(dir, actor, rename); err != nil {
+		if err := history.Write(dir, actor, rename(dir)); err != nil {
 			return carrying[:i], err
 		}
 	}
@@ -248,9 +256,13 @@ func blockers(ids []string, in map[string]struct{}, self string) error {
 }
 
 // fill gives a Task typed by hand without an id or a created date the ones an
-// add would have, so a write leaves no Task the file's rules flag for it.
-func fill(f *taskfile.File) {
-	ids := every(f.Tasks)
+// add would have, so a write leaves no Task the file's rules flag for it. It
+// answers the ids the Repo has spent, those it gave included.
+func fill(dir string, f *taskfile.File) (map[string]struct{}, error) {
+	ids, err := spent(dir, f)
+	if err != nil {
+		return nil, err
+	}
 	walk(f.Tasks, func(t *taskfile.Task) {
 		if t.ID == "" {
 			t.ID = fresh(ids)
@@ -264,6 +276,7 @@ func fill(f *taskfile.File) {
 			set(t, "ended", today())
 		}
 	})
+	return ids, nil
 }
 
 // given is a set as a caller typed it, without the empty entries a cleared

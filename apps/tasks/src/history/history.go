@@ -183,6 +183,28 @@ func Log(dir string) ([]Commit, error) {
 	return log, nil
 }
 
+// Added is every line a commit in dir's tasks history added to TASKS.md.
+// A Repo never written through has none.
+func Added(dir string) ([]string, error) {
+	if _, err := os.Stat(filepath.Join(dir, gitDir)); errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if _, err := tasks(dir, "rev-parse", "-q", "--verify", "HEAD"); err != nil {
+		return nil, nil
+	}
+	out, err := tasks(dir, "log", "-p", "--format=", "--unified=0", "--", file)
+	if err != nil {
+		return nil, err
+	}
+	var added []string
+	for line := range strings.SplitSeq(out, "\n") {
+		if rest, ok := strings.CutPrefix(line, "+"); ok && !strings.HasPrefix(rest, "++") {
+			added = append(added, rest)
+		}
+	}
+	return added, nil
+}
+
 // Show is TASKS.md as the commit left it, and "" for no commit at all.
 func Show(dir, hash string) (string, error) {
 	if hash == "" {

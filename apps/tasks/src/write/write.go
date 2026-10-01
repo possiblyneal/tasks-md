@@ -90,12 +90,14 @@ func Add(dir, actor string, n New) (string, error) {
 		if err != nil {
 			return "", "", err
 		}
-		fill(f)
-		ids := every(f.Tasks)
-		if err := blockers(n.BlockedBy, ids, ""); err != nil {
+		used, err := fill(dir, f)
+		if err != nil {
 			return "", "", err
 		}
-		id = fresh(ids)
+		if err := blockers(n.BlockedBy, every(f.Tasks), ""); err != nil {
+			return "", "", err
+		}
+		id = fresh(used)
 		place(&f.Tasks, n.task(state, id))
 		return taskfile.Write(f), "add ^" + id + " " + n.Title, nil
 	})
@@ -166,7 +168,9 @@ func Move(dir, actor, id string, to taskfile.State, reason string) error {
 		if err != nil {
 			return "", "", err
 		}
-		fill(f)
+		if _, err := fill(dir, f); err != nil {
+			return "", "", err
+		}
 		path := find(f, id)
 		if path == nil {
 			return "", "", NoTask(id)
@@ -219,7 +223,10 @@ func AddSubtasks(dir, actor, parent, version string, subtasks []New) ([]string, 
 		if err != nil {
 			return "", "", err
 		}
-		fill(f)
+		used, err := fill(dir, f)
+		if err != nil {
+			return "", "", err
+		}
 		ids := every(f.Tasks)
 		under := path[len(path)-1].task
 		was := make([]bool, len(path))
@@ -230,7 +237,8 @@ func AddSubtasks(dir, actor, parent, version string, subtasks []New) ([]string, 
 			if err := blockers(n.BlockedBy, ids, ""); err != nil {
 				return "", "", err
 			}
-			id := fresh(ids)
+			id := fresh(used)
+			used[id] = struct{}{}
 			ids[id] = struct{}{}
 			made = append(made, id)
 			place(&under.Subtasks, n.task(states[i], id))
@@ -383,7 +391,26 @@ func every(tasks []*taskfile.Task) map[string]struct{} {
 	return ids
 }
 
-// fresh is an id no Task in the Repo has: four lowercase letters or digits.
+// spent is every id the Repo has used: each Task's in f and each its tasks
+// history ever held, so a deleted Task's id never comes back to name another
+// and draw the first one's history.
+func spent(dir string, f *taskfile.File) (map[string]struct{}, error) {
+	ids := every(f.Tasks)
+	added, err := history.Added(dir)
+	if err != nil {
+		return nil, err
+	}
+	for _, line := range added {
+		if m := idLine.FindStringSubmatch(line); m != nil {
+			ids[m[1]] = struct{}{}
+		}
+	}
+	return ids, nil
+}
+
+var idLine = regexp.MustCompile(`^\s*- id: (\S+)\s*$`)
+
+// fresh is an id not among those taken: four lowercase letters or digits.
 func fresh(taken map[string]struct{}) string {
 	const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
 	for {

@@ -32,7 +32,7 @@ func Pass(today time.Time, dirs ...string) {
 		if err != nil {
 			continue
 		}
-		if f, _ := taskfile.Parse(string(text)); len(due(f, today)) == 0 {
+		if f, _ := taskfile.Parse(string(text)); len(due(f, today, every(f.Tasks))) == 0 {
 			continue
 		}
 		_ = history.Write(dir, Server, func(before string) (string, string, error) {
@@ -40,15 +40,18 @@ func Pass(today time.Time, dirs ...string) {
 			if err != nil {
 				return "", "", err
 			}
-			fill(f)
-			done := due(f, today)
+			used, err := fill(dir, f)
+			if err != nil {
+				return "", "", err
+			}
+			done := due(f, today, used)
 			return taskfile.Write(f), strings.Join(done, ", "), nil
 		})
 	}
 }
 
 // due does to f what today makes due and says what it did, one phrase each.
-func due(f *taskfile.File, today time.Time) []string {
+func due(f *taskfile.File, today time.Time, used map[string]struct{}) []string {
 	date := today.Format(time.DateOnly)
 	var done []string
 	var ended [][]at
@@ -65,7 +68,7 @@ func due(f *taskfile.File, today time.Time) []string {
 		}
 	})
 	for _, path := range ended {
-		if phrase := repeat(f, path, today); phrase != "" {
+		if phrase := repeat(f, path, today, used); phrase != "" {
 			done = append(done, phrase)
 		}
 	}
@@ -77,8 +80,8 @@ func due(f *taskfile.File, today time.Time) []string {
 // and moves the rule onto it, or takes the rule off when it has run out. The
 // next is due on the first date the rule produces after both today and the
 // ended one's Deadline, so missed dates are not made up and an early finish
-// does not repeat its own date.
-func repeat(f *taskfile.File, path []at, today time.Time) string {
+// does not repeat its own date. The copy is named from ids not in used.
+func repeat(f *taskfile.File, path []at, today time.Time, used map[string]struct{}) string {
 	old := path[len(path)-1]
 	rule, err := schedule.Parse(old.task.Attr("series"))
 	if err != nil {
@@ -95,13 +98,12 @@ func repeat(f *taskfile.File, path []at, today time.Time) string {
 		return "end the series of ^" + old.task.ID
 	}
 
-	ids := every(f.Tasks)
 	named := map[*taskfile.Task]string{}
 	renamed := map[string]string{}
 	var name func(*taskfile.Task)
 	name = func(t *taskfile.Task) {
-		id := fresh(ids)
-		ids[id] = struct{}{}
+		id := fresh(used)
+		used[id] = struct{}{}
 		named[t] = id
 		if t.ID != "" {
 			renamed[t.ID] = id
