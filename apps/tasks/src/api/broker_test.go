@@ -116,6 +116,9 @@ func TestCaptureAmendingATaskCarriesItAndAnswersItWhole(t *testing.T) {
 			t.Errorf("POST /api/capture %s answered %d, want 404", body, w.Code)
 		}
 	}
+	if w := post(t, h, "/api/capture", `{"text": "later", "task": "m3qa"}`); w.Code != http.StatusBadRequest {
+		t.Errorf("amending a Task with no Repo named answered %d, want 400", w.Code)
+	}
 }
 
 func TestAskAnswersAboutTheTasksInViewAndWritesNothing(t *testing.T) {

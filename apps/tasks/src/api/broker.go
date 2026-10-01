@@ -47,6 +47,10 @@ func capture(o Options, w http.ResponseWriter, r *http.Request) {
 	}
 	dump := write.DumpOf(text, read, o.now())
 	if body.Task != "" {
+		if body.Repo == "" {
+			fail(w, usage{errors.New("name the Repo the Task is in")})
+			return
+		}
 		found, err := board.Named(body.Repo)
 		if err != nil {
 			fail(w, err)
