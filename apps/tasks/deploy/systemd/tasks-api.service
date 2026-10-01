@@ -1,6 +1,6 @@
 [Unit]
 Description=tasks api: the json and the browser client, on the lan
-Documentation=https://github.com/possiblyneal/todo
+Documentation=https://github.com/possiblyneal/tasks-md
 # Nothing to order against: `-addr :8080` is a wildcard bind, which needs no
 # address to exist yet. A drop-in naming a specific address does need one, and
 # the user manager has no network-online.target to wait on -- it is a system
