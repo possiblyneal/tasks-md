@@ -193,9 +193,9 @@ up` or why it refuses writes, as the read carries them in `flags`.
   `role="status"` line and disables every write control: no drag, no hold,
   no Move to, no Add, no Edit, Delete or Break down in the panel, no
   submitting a form already open, and no dump or question in the box; a
-  breakdown already open answers and approves nothing. A write control added later reads the same `offline`. The next
-  poll that
-  reaches the server ends it, with no reload.
+  breakdown already open answers and approves nothing. A write control added
+  later reads the same `offline`. The next poll that reaches the server ends
+  it, with no reload.
 - **The worker is a module, and every chunk the page loads is in
   `index.html`.** `sw.js` imports the chunk it shares with the page, which
   Safari allows from iOS 15. `keep` finds what to hold by reading `/assets/`
