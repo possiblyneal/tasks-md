@@ -3,6 +3,7 @@ import { type DragEvent, useRef, useState } from 'react'
 import { sentence } from './api'
 import { Due } from './Due'
 import { useHold } from './hold'
+import { Metrics } from './Metrics'
 import { MoveTo } from './MoveTo'
 import { Narrow } from './Narrow'
 import { Panel } from './Panel'
@@ -145,6 +146,7 @@ export function App() {
           onChange={setNarrowing}
         />
       )}
+      {board && <Metrics weeks={board.metrics} />}
       {flagged.length > 0 && (
         <aside className="problems" aria-label="Problems">
           <h2>Problems</h2>

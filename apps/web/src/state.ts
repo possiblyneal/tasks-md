@@ -81,13 +81,30 @@ export type Repo = {
 /**
  * A whole read: every Repo, what was wrong with the config, the sorts a read
  * can be ordered by, and the host's local date as `YYYY-MM-DD`, which is the
- * day a Deadline is today or Overdue against.
+ * day a Deadline is today or Overdue against, and the weekly metrics.
  */
 export type Board = {
   repos: Repo[]
   errors: string[]
   sorts: string[]
   today: string
+  /**
+   * The last twelve weeks, oldest first, counted under the read's Repo and
+   * Tags alone, so they follow the chips and nothing else.
+   */
+  metrics: Week[]
+}
+
+/**
+ * One week of the metrics: the Tasks created in it, and those that ended Done
+ * and ended Declined, a parent on the day its last Subtask did. `start` is its
+ * Monday on the host, as `YYYY-MM-DD`.
+ */
+export type Week = {
+  start: string
+  added: number
+  done: number
+  declined: number
 }
 
 /**

@@ -2,7 +2,7 @@
 // board of two Repos, and a fetch that answers `GET /api/state` and records
 // what it was asked. No test file imports another, so this is where they meet.
 
-import type { Board, Task } from './state'
+import type { Board, Task, Week } from './state'
 
 export function task(
   fields: Partial<Task> & Pick<Task, 'title' | 'state'>,
@@ -23,6 +23,16 @@ export function task(
     version: 'v0',
     ...fields,
   }
+}
+
+/** Twelve weeks to 2026-09-28, the ones named filled in. */
+export function weeks(counted: Record<string, Omit<Week, 'start'>>): Week[] {
+  return Array.from({ length: 12 }, (_, i) => {
+    const start = new Date(Date.UTC(2026, 8, 28 - 7 * (11 - i)))
+      .toISOString()
+      .slice(0, 10)
+    return { start, added: 0, done: 0, declined: 0, ...counted[start] }
+  })
 }
 
 export const BOARD: Board = {
@@ -89,6 +99,10 @@ export const BOARD: Board = {
   errors: [],
   sorts: ['file', 'title', 'deadline', 'created', 'priority', 'estimate'],
   today: '2026-10-01',
+  metrics: weeks({
+    '2026-09-21': { added: 0, done: 4, declined: 0 },
+    '2026-09-28': { added: 2, done: 1, declined: 0 },
+  }),
 }
 
 /** Every request the board made, so what it asked for and how is checkable. */
