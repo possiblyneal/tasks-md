@@ -30,6 +30,11 @@ RestartSec=5
 # that boundary and nothing here narrows it. Off-LAN reach -- a host that grows
 # an interface facing further than the LAN -- is that record's first re-check
 # trigger, and it arrives by topology as readily as by decision.
+#
+# The address to give out is https://tasks.lan: Traefik on `server` ends TLS
+# there with the Homelab CA `*.lan` leaf and forwards to this port. Plain http
+# on :8080 still answers, but it is not the address to use: a service worker,
+# and so the installed board, runs only over HTTPS.
 
 [Install]
 WantedBy=default.target
