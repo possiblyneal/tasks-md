@@ -18,7 +18,7 @@ This amends ADR 0004's **History** and **Discovery** points; the rest of ADR 000
 - A Repo's code history ignores `TASKS.md`. A second git history in the same folder (`.tasks.git`, also ignored) tracks `TASKS.md` alone, so the file sits at the Repo's root, the same on every code branch.
 - Every write through `tasks` is one commit to that history, then a push to a `tasks` branch on the Repo's own remote. The `tasks` branch holds only `TASKS.md`; nothing merges into it and it merges into nothing.
 - A push that fails or is refused does not fail the write: the commit stays local, the board marks the Repo not pushed, and the next write retries. A Repo with no remote, such as one that holds no code, stays local and the board marks it not backed up.
-- The template and a one-time operator step put `/TASKS.md` and `/.tasks.git` in a Repo's `.gitignore`. A write that finds a Repo with a code history ignoring neither appends them itself, leaving one uncommitted `.gitignore` change rather than a tasks history a `git add -A` would commit into the code.
+- The template and a one-time operator step put `/TASKS.md` and `/.tasks.git` in a Repo's `.gitignore`. A write that finds a code history not yet ignoring one of them appends what is missing itself, leaving one uncommitted `.gitignore` change rather than a tasks history a `git add -A` would commit into the code.
 - A linked worktree has no `TASKS.md` of its own; `tasks` run there reads and writes the main checkout's.
 - Writes are refused, and the Repo flagged, while `TASKS.md` holds conflict markers or its history is mid-merge, mid-rebase or on a detached HEAD.
 
