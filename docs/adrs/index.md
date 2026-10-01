@@ -7,5 +7,5 @@
 | [0001](0001-ship-todo-as-one-go-binary.md) | Ship Todo as One Go Binary | superseded by [0003](0003-replace-the-tui-with-a-browser-client.md) |
 | [0002](0002-subtask-tree-is-one-aggregate.md) | A Subtask Tree Is One Aggregate, Leased Whole | accepted |
 | [0003](0003-replace-the-tui-with-a-browser-client.md) | Replace the TUI with a Browser Client over an HTTP API | accepted |
-| [0004](0004-tasks-md-is-the-store.md) | A tasks.md File in Each Repo Is the Store | accepted |
-| [0005](0005-tasks-md-keeps-its-own-history.md) | tasks.md Keeps Its Own Git History, Apart from the Code's Branches | accepted |
+| [0004](0004-tasks-md-is-the-store.md) | A TASKS.md File in Each Repo Is the Store | accepted |
+| [0005](0005-tasks-md-keeps-its-own-history.md) | TASKS.md Keeps Its Own Git History, Apart from the Code's Branches | accepted |

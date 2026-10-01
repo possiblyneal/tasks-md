@@ -182,7 +182,7 @@ func RenameTag(dirs []string, actor, from, to string, versions []string) ([]stri
 	// A Repo carrying no Task with the Tag is left alone, broken or not.
 	var carrying []string
 	for _, dir := range dirs {
-		text, err := os.ReadFile(filepath.Join(dir, "tasks.md"))
+		text, err := os.ReadFile(filepath.Join(dir, "TASKS.md"))
 		if err != nil {
 			return nil, err
 		}

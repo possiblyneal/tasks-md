@@ -93,3 +93,5 @@ target/
 # Generated artifacts
 /artifacts/
 /downloads/
+/TASKS.md
+/.tasks.git

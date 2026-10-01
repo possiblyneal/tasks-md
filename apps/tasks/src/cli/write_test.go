@@ -90,8 +90,8 @@ func TestAddIsOneCommitPushedToTheTasksBranch(t *testing.T) {
 	}
 
 	want := "- [ ] Measure the hallway | inbox #measuring\n  - id: " + id + "\n  - created: " + today() + "\n"
-	if file := read(t, filepath.Join(repo, "tasks.md")); !strings.Contains(file, want) {
-		t.Errorf("tasks.md =\n%s\nwant it to hold\n%s", file, want)
+	if file := read(t, filepath.Join(repo, "TASKS.md")); !strings.Contains(file, want) {
+		t.Errorf("TASKS.md =\n%s\nwant it to hold\n%s", file, want)
 	}
 
 	commits := tasksLog(t, repo, "%s|%an <%ae>|%(trailers:key=Generated-By,valueonly,separator=)")
@@ -102,8 +102,8 @@ func TestAddIsOneCommitPushedToTheTasksBranch(t *testing.T) {
 	if strings.Join(commits, "\n") != strings.Join(wantCommits, "\n") {
 		t.Errorf("tasks history =\n%s\nwant\n%s", strings.Join(commits, "\n"), strings.Join(wantCommits, "\n"))
 	}
-	if files := git(t, repo, "--git-dir=.tasks.git", "show", "--format=", "--name-only", "HEAD"); files != "tasks.md" {
-		t.Errorf("the add committed %q, want tasks.md alone", files)
+	if files := git(t, repo, "--git-dir=.tasks.git", "show", "--format=", "--name-only", "HEAD"); files != "TASKS.md" {
+		t.Errorf("the add committed %q, want TASKS.md alone", files)
 	}
 	if pushed, head := git(t, bare, "rev-parse", "tasks"), git(t, repo, "--git-dir=.tasks.git", "rev-parse", "HEAD"); pushed != head {
 		t.Errorf("the remote's tasks branch is %s, want the add %s", pushed, head)
@@ -147,8 +147,8 @@ color: green
     - created: 2026-09-20
     - ended: ` + today() + `
 `
-	if got := read(t, filepath.Join(repo, "tasks.md")); got != ended {
-		t.Errorf("after moving m3qc to done, tasks.md =\n%s\nwant\n%s", got, ended)
+	if got := read(t, filepath.Join(repo, "TASKS.md")); got != ended {
+		t.Errorf("after moving m3qc to done, TASKS.md =\n%s\nwant\n%s", got, ended)
 	}
 
 	// Reopening it reopens the parent: each goes back above the ended Tasks
@@ -174,8 +174,8 @@ color: green
     - id: m3qb
     - created: 2026-09-20
 `
-	if got := read(t, filepath.Join(repo, "tasks.md")); got != reopened {
-		t.Errorf("after reopening m3qc, tasks.md =\n%s\nwant\n%s", got, reopened)
+	if got := read(t, filepath.Join(repo, "TASKS.md")); got != reopened {
+		t.Errorf("after reopening m3qc, TASKS.md =\n%s\nwant\n%s", got, reopened)
 	}
 
 	subjects := tasksLog(t, repo, "%s")
@@ -199,14 +199,14 @@ func TestAReasonIsHeldOnlyWhileDeferredOrDeclined(t *testing.T) {
 
 	moving(t, "pp01", "backlog", "-repo", "errands")
 	backlog := "# Tasks\n\n- [ ] Renew the passport | backlog\n  - id: pp01\n  - created: 2026-09-01\n"
-	if got := read(t, filepath.Join(repo, "tasks.md")); got != backlog {
-		t.Errorf("leaving Deferred, tasks.md =\n%s\nwant\n%s", got, backlog)
+	if got := read(t, filepath.Join(repo, "TASKS.md")); got != backlog {
+		t.Errorf("leaving Deferred, TASKS.md =\n%s\nwant\n%s", got, backlog)
 	}
 
 	moving(t, "pp01", "declined", "-reason", "moving abroad", "-repo", "errands")
 	declined := "# Tasks\n\n- [-] Renew the passport | declined\n  - id: pp01\n  - created: 2026-09-01\n  - reason: moving abroad\n  - ended: " + today() + "\n"
-	if got := read(t, filepath.Join(repo, "tasks.md")); got != declined {
-		t.Errorf("declining, tasks.md =\n%s\nwant\n%s", got, declined)
+	if got := read(t, filepath.Join(repo, "TASKS.md")); got != declined {
+		t.Errorf("declining, TASKS.md =\n%s\nwant\n%s", got, declined)
 	}
 }
 
@@ -215,7 +215,7 @@ func TestMovesTheRulesTurnAwayChangeNothing(t *testing.T) {
 	repo := filepath.Join(code, "house-move")
 	withRemote(t, repo)
 	moving(t, "v9t1", "doing", "-repo", "house-move")
-	before := read(t, filepath.Join(repo, "tasks.md"))
+	before := read(t, filepath.Join(repo, "TASKS.md"))
 	commits := len(tasksLog(t, repo, "%h"))
 
 	for _, c := range []struct {
@@ -235,8 +235,8 @@ func TestMovesTheRulesTurnAwayChangeNothing(t *testing.T) {
 			t.Errorf("tasks move %v exited %d saying %q, want %d saying %q", c.args, status, errs, c.status, c.says)
 		}
 	}
-	if got := read(t, filepath.Join(repo, "tasks.md")); got != before {
-		t.Errorf("a refused move changed tasks.md to\n%s", got)
+	if got := read(t, filepath.Join(repo, "TASKS.md")); got != before {
+		t.Errorf("a refused move changed TASKS.md to\n%s", got)
 	}
 	if got := len(tasksLog(t, repo, "%h")); got != commits {
 		t.Errorf("a refused move made %d commits", got-commits)
@@ -313,7 +313,7 @@ func TestAHandEditIsCommittedAsADirectEditBeforeTheWrite(t *testing.T) {
 	withRemote(t, repo)
 	moving(t, "v9t1", "doing", "-repo", "house-move")
 
-	edited := strings.Replace(read(t, filepath.Join(repo, "tasks.md")), "Book the van", "Book the big van", 1)
+	edited := strings.Replace(read(t, filepath.Join(repo, "TASKS.md")), "Book the van", "Book the big van", 1)
 	place(t, repo, edited)
 	moving(t, "v9t1", "backlog", "-repo", "house-move")
 
@@ -342,7 +342,7 @@ func TestTheCodeHistoryIgnoresTheFileAndTheTasksHistory(t *testing.T) {
 	moving(t, "v9t1", "doing", "-repo", "house-move")
 	moving(t, "v9t1", "backlog", "-repo", "house-move")
 
-	if got := read(t, filepath.Join(repo, ".gitignore")); got != "node_modules/\n/tasks.md\n/.tasks.git\n" {
+	if got := read(t, filepath.Join(repo, ".gitignore")); got != "node_modules/\n/TASKS.md\n/.tasks.git\n" {
 		t.Errorf(".gitignore = %q, want both appended once", got)
 	}
 	if status := git(t, repo, "status", "--porcelain"); status != "?? .gitignore" {
@@ -358,7 +358,7 @@ func TestARepoInAMessRefusesWritesAndIsFlagged(t *testing.T) {
 	}{
 		{"conflict markers", func(t *testing.T, repo string) {
 			place(t, repo, houseMove+"<<<<<<< ours\n=======\n>>>>>>> theirs\n")
-		}, "refusing writes: tasks.md holds conflict markers"},
+		}, "refusing writes: TASKS.md holds conflict markers"},
 		{"mid-merge", func(t *testing.T, repo string) {
 			head := git(t, repo, "--git-dir=.tasks.git", "rev-parse", "HEAD")
 			if err := os.WriteFile(filepath.Join(repo, ".tasks.git", "MERGE_HEAD"), []byte(head+"\n"), 0o644); err != nil {
@@ -380,14 +380,14 @@ func TestARepoInAMessRefusesWritesAndIsFlagged(t *testing.T) {
 			withRemote(t, repo)
 			moving(t, "v9t1", "doing", "-repo", "house-move")
 			c.mess(t, repo)
-			before := read(t, filepath.Join(repo, "tasks.md"))
+			before := read(t, filepath.Join(repo, "TASKS.md"))
 
 			status, _, errs := run(t, "move", "v9t1", "backlog", "-repo", "house-move")
 			if status != 3 || !strings.Contains(errs, c.flags) {
 				t.Errorf("a write to a Repo %s exited %d saying %q, want 3 saying %q", c.name, status, errs, c.flags)
 			}
-			if got := read(t, filepath.Join(repo, "tasks.md")); got != before {
-				t.Errorf("the refused write changed tasks.md")
+			if got := read(t, filepath.Join(repo, "TASKS.md")); got != before {
+				t.Errorf("the refused write changed TASKS.md")
 			}
 			if got := flagsOf(t, "house-move"); got != c.flags {
 				t.Errorf("tasks repos flags %q, want %q", got, c.flags)
@@ -433,8 +433,8 @@ func TestAWriteActsOnTheNearestTasksFileAbove(t *testing.T) {
 	}
 	t.Chdir(deep)
 	moving(t, "v9t1", "doing")
-	if !strings.Contains(read(t, filepath.Join(repo, "tasks.md")), "Book the van | doing") {
-		t.Error("a move from a folder inside the Repo did not reach its tasks.md")
+	if !strings.Contains(read(t, filepath.Join(repo, "TASKS.md")), "Book the van | doing") {
+		t.Error("a move from a folder inside the Repo did not reach its TASKS.md")
 	}
 
 	t.Chdir(code)
@@ -460,11 +460,11 @@ func TestAWriteFromALinkedWorktreeActsOnTheMainCheckout(t *testing.T) {
 
 	t.Chdir(filepath.Join(tree, "rooms"))
 	moving(t, "v9t1", "doing")
-	if !strings.Contains(read(t, filepath.Join(repo, "tasks.md")), "Book the van | doing") {
-		t.Error("a move from a linked worktree did not reach the main checkout's tasks.md")
+	if !strings.Contains(read(t, filepath.Join(repo, "TASKS.md")), "Book the van | doing") {
+		t.Error("a move from a linked worktree did not reach the main checkout's TASKS.md")
 	}
-	if _, err := os.Stat(filepath.Join(tree, "tasks.md")); err == nil {
-		t.Error("a move from a linked worktree wrote a tasks.md there")
+	if _, err := os.Stat(filepath.Join(tree, "TASKS.md")); err == nil {
+		t.Error("a move from a linked worktree wrote a TASKS.md there")
 	}
 }
 
@@ -516,8 +516,8 @@ func TestAddTakesItsAttributesAndRefusesBadOnes(t *testing.T) {
 	id := strings.TrimSpace(out)
 	want := "- [ ] Pay the deposit | backlog\n  - id: " + id + "\n  - created: " + today() +
 		"\n  - deadline: 2026-10-15\n  - priority: high\n  - why: the landlord asked\n  - blocked by: v9t1\n"
-	if file := read(t, filepath.Join(repo, "tasks.md")); !strings.HasSuffix(file, want) {
-		t.Errorf("tasks.md =\n%s\nwant it to end with\n%s", file, want)
+	if file := read(t, filepath.Join(repo, "TASKS.md")); !strings.HasSuffix(file, want) {
+		t.Errorf("TASKS.md =\n%s\nwant it to end with\n%s", file, want)
 	}
 
 	for _, bad := range [][]string{

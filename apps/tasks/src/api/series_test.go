@@ -116,7 +116,7 @@ func TestThePassRunsJustAfterLocalMidnight(t *testing.T) {
 	if d := <-c.asked; d != time.Hour+time.Second {
 		t.Errorf("at 23:00 the pass waits %v, want until one second past midnight", d)
 	}
-	before, err := os.ReadFile(filepath.Join(code, "errands", "tasks.md"))
+	before, err := os.ReadFile(filepath.Join(code, "errands", "TASKS.md"))
 	if err != nil || string(before) != errands {
 		t.Fatalf("the pass ran before midnight: %s", before)
 	}

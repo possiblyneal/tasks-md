@@ -1,7 +1,7 @@
 ---
 type: Architecture Decision Record
-title: A tasks.md File in Each Repo Is the Store
-description: Every Task lives in exactly one tasks.md at the root of one Repo, git history replaces the Change History, and a stale write is refused instead of a Lease being held.
+title: A TASKS.md File in Each Repo Is the Store
+description: Every Task lives in exactly one TASKS.md at the root of one Repo, git history replaces the Change History, and a stale write is refused instead of a Lease being held.
 scope: [global, domain]
 tags: [storage, domain-model, concurrency]
 generated: { by: "agent/claude-opus-5-5", at: "2026-09-29T00:00:00Z" }
@@ -9,20 +9,24 @@ superseded_by:
 status: accepted
 ---
 
-# A tasks.md File in Each Repo Is the Store
+# A TASKS.md File in Each Repo Is the Store
 
 ## Decision
 
-The store is a `tasks.md` file at the root of each **Repo**: any directory that
+The store is a `TASKS.md` file at the root of each **Repo**: any directory that
 holds one, whether or not it holds code. A Task lives in exactly one Repo. The
 SQLite store, the Lease and the Change History as a stored record are retired.
 
+- **The name is in capitals**, beside `README.md` and `CLAUDE.md`, because the
+  file is written to be read by a person. Amended 2026-10-01, replacing
+  `tasks.md`.
+
 - **History** is git. Every write through the tracker is a commit to that
-  `tasks.md` authored by the Actor, and the tracker runs `git init` on a Repo
+  `TASKS.md` authored by the Actor, and the tracker runs `git init` on a Repo
   that is not already a git repository.
 - **Concurrency** is a stale-write refusal: a write made against an older copy
   of the file is rejected and the writer re-reads. Nothing is silently lost.
-- **Only `tasks` writes `tasks.md`**, by convention: the markdown is there to be
+- **Only `tasks` writes `TASKS.md`**, by convention: the markdown is there to be
   read and browsed, and the verbs carry the refusal and the commit. A direct
   edit cannot be prevented for a process running as the operator, so one that
   gets through is picked up and committed with its Actor unknown, but it is off
@@ -38,7 +42,7 @@ SQLite store, the Lease and the Change History as a stored record are retired.
   is worth.
 
 It does not decide the file's grammar, which Task attributes survive, or how existing SQLite data moves. The wayfinding map
-"Map: tasks.md as the store, v1.0" (#92) carries those.
+"Map: TASKS.md as the store, v1.0" (#92) carries those.
 
 ## Context
 
@@ -55,7 +59,7 @@ thing that prevented all three.
   imported edits made to the file. It was rejected because two sources of truth
   for one Task are what the operator wanted gone.
 - **The file is a read-only export.** It was rejected because an Agent editing
-  its own repo's `tasks.md` is the workflow this exists for.
+  its own repo's `TASKS.md` is the workflow this exists for.
 - **Last write wins.** It was rejected because three writers touch one file:
   the web page, an Agent, and the task server.
 
@@ -69,9 +73,9 @@ thing that prevented all three.
   Lease, Change History and Actor are redefined. Each term is rewritten when the
   map ticket that settles it closes.
 - A direct edit bypasses the stale-write refusal, so a rare clash between a
-  hand edit and a web edit can overwrite one of them. Keeping `tasks.md`
+  hand edit and a web edit can overwrite one of them. Keeping `TASKS.md`
   read-only by convention keeps that rare; the operator's own Claude Code
-  settings deny its Edit and Write tools on `tasks.md`, which steers an Agent to
+  settings deny its Edit and Write tools on `TASKS.md`, which steers an Agent to
   the verbs but does not stop a shell write.
 - Because only `tasks` writes the file, the parser and `tasks lint` may be strict
   about its format rather than tolerating hand-typed variations.

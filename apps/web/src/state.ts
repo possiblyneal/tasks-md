@@ -61,7 +61,7 @@ export type Task = {
   rank: number
 }
 
-/** One thing wrong with a Repo's tasks.md, at the line it is on. */
+/** One thing wrong with a Repo's TASKS.md, at the line it is on. */
 export type Problem = { line: number; message: string }
 
 /** One Repo's read. Any problem flags the Repo wherever it is drawn. */

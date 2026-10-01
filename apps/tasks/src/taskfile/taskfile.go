@@ -1,4 +1,4 @@
-// Package taskfile is the tasks.md format: Parse reads a Repo's file into its
+// Package taskfile is the TASKS.md format: Parse reads a Repo's file into its
 // Task tree plus every problem found, by line, and Write gives the tree back
 // as canonical text. The format is settled in issues #97 and #105:
 //
@@ -88,7 +88,7 @@ func (t *Task) BlockedBy() []string {
 	return strings.FieldsFunc(t.Attr("blocked by"), func(r rune) bool { return r == ',' || r == ' ' })
 }
 
-// File is a whole tasks.md.
+// File is a whole TASKS.md.
 type File struct {
 	Preamble string
 	Tasks    []*Task
@@ -135,7 +135,7 @@ type open struct {
 	desc      []string
 }
 
-// Parse reads a tasks.md. It always returns a File, holding whatever could be
+// Parse reads a TASKS.md. It always returns a File, holding whatever could be
 // read, and the problems sorted by line.
 func Parse(text string) (*File, []Problem) {
 	f := &File{}

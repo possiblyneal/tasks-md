@@ -1,5 +1,5 @@
 // Package repos finds the Repos the tracker reads: the folders directly inside
-// a configured root that hold a tasks.md.
+// a configured root that hold a TASKS.md.
 //
 // The roots come from ConfigPath, a plain key file:
 //
@@ -23,7 +23,7 @@ import (
 	"strings"
 )
 
-// Repo is a folder holding a tasks.md. Name is the folder's name under its
+// Repo is a folder holding a TASKS.md. Name is the folder's name under its
 // root, which is how a person names it; Path is where it really is, with any
 // link resolved.
 type Repo struct {
@@ -31,8 +31,8 @@ type Repo struct {
 	Path string `json:"path"`
 }
 
-// File is the Repo's tasks.md.
-func (r Repo) File() string { return filepath.Join(r.Path, "tasks.md") }
+// File is the Repo's TASKS.md.
+func (r Repo) File() string { return filepath.Join(r.Path, "TASKS.md") }
 
 // ConfigPath is ~/.config/tasks/config, or under $XDG_CONFIG_HOME when that is
 // set.
@@ -102,7 +102,7 @@ func Load(path string) (Config, error) {
 }
 
 // Find scans the roots afresh: each root's direct children that hold a
-// tasks.md, dot folders skipped and links followed, with two paths to one
+// TASKS.md, dot folders skipped and links followed, with two paths to one
 // folder counted once. One name under two roots is an error naming both,
 // and the first is kept. The Repos come back sorted by name.
 func Find(roots []string) ([]Repo, []error) {
@@ -122,7 +122,7 @@ func Find(roots []string) ([]Repo, []error) {
 				continue
 			}
 			path := filepath.Join(root, name)
-			if info, err := os.Stat(filepath.Join(path, "tasks.md")); err != nil || !info.Mode().IsRegular() {
+			if info, err := os.Stat(filepath.Join(path, "TASKS.md")); err != nil || !info.Mode().IsRegular() {
 				continue
 			}
 			real, err := filepath.EvalSymlinks(path)

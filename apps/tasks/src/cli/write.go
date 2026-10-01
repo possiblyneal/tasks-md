@@ -288,7 +288,7 @@ func where(name string) (string, error) {
 	return dir, err
 }
 
-// nearest is the Repo named, or else the nearest tasks.md at or above the
+// nearest is the Repo named, or else the nearest TASKS.md at or above the
 // working directory. In a linked git worktree that is looked for from the
 // main checkout, since the worktree's own copy of the folder is not where the
 // Repo's Tasks live.
@@ -303,11 +303,11 @@ func nearest(name string) (string, error) {
 	}
 	start := history.MainCheckout(cwd)
 	for dir := start; ; dir = filepath.Dir(dir) {
-		if info, err := os.Stat(filepath.Join(dir, "tasks.md")); err == nil && info.Mode().IsRegular() {
+		if info, err := os.Stat(filepath.Join(dir, "TASKS.md")); err == nil && info.Mode().IsRegular() {
 			return filepath.EvalSymlinks(dir)
 		}
 		if dir == filepath.Dir(dir) {
-			return "", fmt.Errorf("no tasks.md at or above %s; name a Repo with -repo", start)
+			return "", fmt.Errorf("no TASKS.md at or above %s; name a Repo with -repo", start)
 		}
 	}
 }

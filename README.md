@@ -33,7 +33,7 @@ Two deployables. `apps/tasks` is a Go binary with three modes:
 | `tasks <verb>` | acts and exits — the agent path, the same in-process call a request makes |
 | `tasks api` | serves the JSON and the browser client so a phone reaches it, LAN only |
 
-`apps/web` is the second: a TypeScript browser client, built to static files `tasks api` serves beside the JSON. The store is a `tasks.md` file in each Repo, a folder directly inside a root named in `~/.config/tasks/config` (`root = <path>` a line; `~/code` when none is named), so it is not a separate process and not a deployable of its own. Three bounded contexts — Tracking, Scheduling, and Change History — collapse into that one binary; `CONTEXT.md` defines the language of each, and `docs/adrs/0001-ship-todo-as-one-go-binary.md` records why one artifact rather than several, and why Go.
+`apps/web` is the second: a TypeScript browser client, built to static files `tasks api` serves beside the JSON. The store is a `TASKS.md` file in each Repo, a folder directly inside a root named in `~/.config/tasks/config` (`root = <path>` a line; `~/code` when none is named), so it is not a separate process and not a deployable of its own. Three bounded contexts — Tracking, Scheduling, and Change History — collapse into that one binary; `CONTEXT.md` defines the language of each, and `docs/adrs/0001-ship-todo-as-one-go-binary.md` records why one artifact rather than several, and why Go.
 
 The decisions behind all of it were worked out as a map of tickets on this repository's own issue tracker, [#1](https://github.com/possiblyneal/todo/issues/1) through [#8](https://github.com/possiblyneal/todo/issues/8), and the operator's original wish list is kept verbatim at `docs/features.md`.
 

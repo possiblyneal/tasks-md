@@ -66,8 +66,8 @@ func TestRepeatSetsARuleShowsItsNextDatesAndTurnsItOff(t *testing.T) {
 	if out != want {
 		t.Errorf("tasks repeat printed\n%s\nwant\n%s", out, want)
 	}
-	if file := read(t, filepath.Join(repo, "tasks.md")); !strings.Contains(file, "  - blocked by: m3qa\n  - series: every 2 weeks on tue from 2026-09-01\n") {
-		t.Errorf("tasks.md =\n%s\nwant v9t1 to carry the rule", file)
+	if file := read(t, filepath.Join(repo, "TASKS.md")); !strings.Contains(file, "  - blocked by: m3qa\n  - series: every 2 weeks on tue from 2026-09-01\n") {
+		t.Errorf("TASKS.md =\n%s\nwant v9t1 to carry the rule", file)
 	}
 
 	// Asked with no rule, it shows the one there is and writes nothing.
@@ -78,8 +78,8 @@ func TestRepeatSetsARuleShowsItsNextDatesAndTurnsItOff(t *testing.T) {
 	if status, _, errs := run(t, "repeat", "v9t1", "-off", "-repo", "house-move"); status != 0 {
 		t.Fatalf("tasks repeat -off exited %d: %s", status, errs)
 	}
-	if file := read(t, filepath.Join(repo, "tasks.md")); strings.Contains(file, "series") {
-		t.Errorf("after -off, tasks.md =\n%s\nwant no rule", file)
+	if file := read(t, filepath.Join(repo, "TASKS.md")); strings.Contains(file, "series") {
+		t.Errorf("after -off, TASKS.md =\n%s\nwant no rule", file)
 	}
 	subjects := tasksLog(t, repo, "%s")
 	wantSubjects := []string{
@@ -117,13 +117,13 @@ func TestEndingAnOccurrenceWritesTheNextOnTheNextPass(t *testing.T) {
 
 	moving(t, "bin2", "done", "-repo", "home")
 	moving(t, "bin3", "declined", "-repo", "home")
-	file := read(t, filepath.Join(repo, "tasks.md"))
+	file := read(t, filepath.Join(repo, "TASKS.md"))
 	if strings.Count(file, "series:") != 1 {
 		t.Fatalf("the move wrote the next Occurrence itself:\n%s", file)
 	}
 
 	listing(t)
-	file = read(t, filepath.Join(repo, "tasks.md"))
+	file = read(t, filepath.Join(repo, "TASKS.md"))
 	next := regexpID(t, file, "Take the bins out | backlog #home")
 	green := regexpID(t, file, "Green bin | backlog")
 	ended := today()
@@ -167,7 +167,7 @@ func TestEndingAnOccurrenceWritesTheNextOnTheNextPass(t *testing.T) {
     - ended: ` + ended + `
 `
 	if file != want {
-		t.Errorf("after the pass, tasks.md =\n%s\nwant\n%s", file, want)
+		t.Errorf("after the pass, TASKS.md =\n%s\nwant\n%s", file, want)
 	}
 
 	// The rule moved off the ended one, so the next pass writes nothing.
@@ -198,14 +198,14 @@ func TestAHandTickedOccurrenceLongOverdueRepeatsOnceFromToday(t *testing.T) {
 
 	listing(t)
 	listing(t)
-	file := read(t, filepath.Join(repo, "tasks.md"))
+	file := read(t, filepath.Join(repo, "TASKS.md"))
 	// Every Monday since August was missed; one Occurrence comes back, due on
 	// the first Monday after today.
 	if strings.Count(file, "Water the plants") != 2 || !strings.Contains(file, "- deadline: 2026-10-05\n  - series: every week on mon from 2026-01-05\n") {
-		t.Errorf("after two passes, tasks.md =\n%s\nwant one next Occurrence due 2026-10-05", file)
+		t.Errorf("after two passes, TASKS.md =\n%s\nwant one next Occurrence due 2026-10-05", file)
 	}
 	if !strings.Contains(file, "- [x] Water the plants | done\n  - id: wat1\n  - created: 2026-01-01\n  - deadline: 2026-08-03\n") {
-		t.Errorf("tasks.md =\n%s\nwant the hand-ticked one Done with its rule moved off", file)
+		t.Errorf("TASKS.md =\n%s\nwant the hand-ticked one Done with its rule moved off", file)
 	}
 	if got := authored(t, repo); !strings.HasPrefix(got, "chore(tasks): next ^") || !strings.HasSuffix(got, "after ^wat1|task server\nchore(tasks): commit a direct edit|direct edit") {
 		t.Errorf("tasks history =\n%s\nwant the hand edit and then one next Occurrence by the task server", got)
@@ -224,8 +224,8 @@ func TestARuleThatHasRunOutEndsTheSeries(t *testing.T) {
 	at(t, "2026-10-01")
 
 	listing(t)
-	if file := read(t, filepath.Join(repo, "tasks.md")); strings.Contains(file, "series") || strings.Count(file, "File the tax return") != 1 {
-		t.Errorf("tasks.md =\n%s\nwant the rule gone and no next Occurrence", file)
+	if file := read(t, filepath.Join(repo, "TASKS.md")); strings.Contains(file, "series") || strings.Count(file, "File the tax return") != 1 {
+		t.Errorf("TASKS.md =\n%s\nwant the rule gone and no next Occurrence", file)
 	}
 	if got := authored(t, repo); !strings.HasPrefix(got, "chore(tasks): end the series of ^tax1|task server") {
 		t.Errorf("tasks history =\n%s", got)
@@ -268,8 +268,8 @@ func TestADeferredTaskWakesToBacklogOnItsUntilDate(t *testing.T) {
   - id: lc01
   - created: 2026-09-01
 `
-	if file := read(t, filepath.Join(repo, "tasks.md")); file != want {
-		t.Errorf("tasks.md =\n%s\nwant\n%s", file, want)
+	if file := read(t, filepath.Join(repo, "TASKS.md")); file != want {
+		t.Errorf("TASKS.md =\n%s\nwant\n%s", file, want)
 	}
 
 	at(t, "2026-10-03")
@@ -296,13 +296,13 @@ func TestARepoRefusingWritesIsSkippedAndTheCallGoesAhead(t *testing.T) {
 `,
 	})
 	at(t, "2026-10-01")
-	before := read(t, filepath.Join(code, "broken", "tasks.md"))
+	before := read(t, filepath.Join(code, "broken", "TASKS.md"))
 
 	status, out, errs := run(t, "list")
 	if status != 0 || !strings.Contains(out, "pp01 backlog") {
 		t.Errorf("tasks list exited %d and printed\n%s%s\nwant the other Repo woken and listed", status, out, errs)
 	}
-	if after := read(t, filepath.Join(code, "broken", "tasks.md")); after != before {
+	if after := read(t, filepath.Join(code, "broken", "TASKS.md")); after != before {
 		t.Errorf("the pass wrote over a Repo refusing writes:\n%s", after)
 	}
 	if flags := flagsOf(t, "broken"); !strings.Contains(flags, "conflict markers") {

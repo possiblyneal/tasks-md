@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// folder makes dir under root, with a tasks.md when held is true.
+// folder makes dir under root, with a TASKS.md when held is true.
 func folder(t *testing.T, root, dir string, held bool) string {
 	t.Helper()
 	path := filepath.Join(root, dir)
@@ -15,7 +15,7 @@ func folder(t *testing.T, root, dir string, held bool) string {
 		t.Fatal(err)
 	}
 	if held {
-		if err := os.WriteFile(filepath.Join(path, "tasks.md"), []byte("# Tasks\n"), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(path, "TASKS.md"), []byte("# Tasks\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}

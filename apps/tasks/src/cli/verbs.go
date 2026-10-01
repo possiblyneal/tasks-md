@@ -176,7 +176,7 @@ func listRepos(args []string, stdout, stderr io.Writer) int {
 }
 
 // lint is `tasks lint [file...]`: every problem in the named files, or in
-// every Repo's tasks.md when none is named, one `file:line: message` a line.
+// every Repo's TASKS.md when none is named, one `file:line: message` a line.
 // It exits 1 when there is any.
 func lint(args []string, stdout, stderr io.Writer) int {
 	fs := flags("lint", stderr)

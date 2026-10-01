@@ -138,7 +138,7 @@ func TestADeletedTaskIsInNoWeek(t *testing.T) {
 	if status, _, errs := run(t, "delete", "sf01", "-repo", "house-move"); status != 0 {
 		t.Fatalf("tasks delete exited %d: %s", status, errs)
 	}
-	if strings.Contains(read(t, filepath.Join(code, "house-move", "tasks.md")), "sf01") {
+	if strings.Contains(read(t, filepath.Join(code, "house-move", "TASKS.md")), "sf01") {
 		t.Fatal("the sofa is still in the file")
 	}
 	if got := stated(t); !strings.Contains(got, "2026-09-28  0      0     1\n") {

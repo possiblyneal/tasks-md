@@ -47,7 +47,7 @@ const work = `# Tasks
 `
 
 // home gives the test a home of its own, with no config, so the one root is
-// ~/code, and writes each Repo's tasks.md into it. It returns ~/code.
+// ~/code, and writes each Repo's TASKS.md into it. It returns ~/code.
 func home(t *testing.T, files map[string]string) string {
 	t.Helper()
 	dir, err := filepath.EvalSymlinks(t.TempDir())
@@ -71,7 +71,7 @@ func place(t *testing.T, dir, text string) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "tasks.md"), []byte(text), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "TASKS.md"), []byte(text), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -369,7 +369,7 @@ const broken = `# Tasks
 
 func TestLintReportsEveryProblemByLine(t *testing.T) {
 	code := home(t, map[string]string{"work": work, "broken": broken})
-	file := filepath.Join(code, "broken", "tasks.md")
+	file := filepath.Join(code, "broken", "TASKS.md")
 
 	status, out, errs := run(t, "lint")
 	if status != 1 {
@@ -397,7 +397,7 @@ func TestLintReportsEveryProblemByLine(t *testing.T) {
 
 func TestLintIsQuietOverACleanFileNamedOnTheCommandLine(t *testing.T) {
 	code := home(t, map[string]string{"work": work})
-	status, out, errs := run(t, "lint", filepath.Join(code, "work", "tasks.md"))
+	status, out, errs := run(t, "lint", filepath.Join(code, "work", "TASKS.md"))
 	if status != 0 || out != "" || errs != "" {
 		t.Errorf("tasks lint exited %d with %q %q, want 0 and nothing", status, out, errs)
 	}

@@ -67,7 +67,7 @@ func TestATasksHistoryNamesEachWritesActorNewestFirst(t *testing.T) {
 	// A hand edit to one Task is drawn on that Task alone, once a write has
 	// committed it.
 	dir := filepath.Join(code, "house-move")
-	text, err := os.ReadFile(filepath.Join(dir, "tasks.md"))
+	text, err := os.ReadFile(filepath.Join(dir, "TASKS.md"))
 	if err != nil {
 		t.Fatal(err)
 	}

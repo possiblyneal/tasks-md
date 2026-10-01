@@ -36,7 +36,7 @@ const work = `# Tasks
 `
 
 // homeWith gives the test a home of its own whose one root, ~/code, holds a
-// folder per entry with that tasks.md. It returns ~/code.
+// folder per entry with that TASKS.md. It returns ~/code.
 func homeWith(t *testing.T, files map[string]string) string {
 	t.Helper()
 	dir, err := filepath.EvalSymlinks(t.TempDir())
@@ -57,7 +57,7 @@ func place(t *testing.T, dir, text string) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "tasks.md"), []byte(text), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "TASKS.md"), []byte(text), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -208,7 +208,7 @@ func TestStateETagFollowsTheFilesAndTheQuery(t *testing.T) {
 	}
 
 	later := time.Now().Add(time.Hour)
-	if err := os.Chtimes(filepath.Join(code, "work", "tasks.md"), later, later); err != nil {
+	if err := os.Chtimes(filepath.Join(code, "work", "TASKS.md"), later, later); err != nil {
 		t.Fatal(err)
 	}
 	if w := get(t, h, "/api/state", http.Header{"If-None-Match": {tag}}); w.Code != http.StatusOK {

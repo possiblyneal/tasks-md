@@ -63,7 +63,7 @@ A Task nested under another Task, to five levels. A Subtask is fixed where it wa
 _Avoid_: Child task, step, checklist item
 
 **Repo**:
-A folder holding a tasks.md, whether or not it holds code, standing for where the work sits: a house move, a job, a codebase. Only a folder directly inside one of the configured roots (by default `~/code`), or a link placed there, is a Repo; a tasks.md any deeper is not. A Task lives in exactly one Repo. Its tasks.md belongs to the folder rather than to any branch of the folder's code: switching branches leaves it as it is, and `tasks` run from a linked worktree reads and writes the main checkout's.
+A folder holding a TASKS.md, whether or not it holds code, standing for where the work sits: a house move, a job, a codebase. Only a folder directly inside one of the configured roots (by default `~/code`), or a link placed there, is a Repo; a TASKS.md any deeper is not. A Task lives in exactly one Repo. Its TASKS.md belongs to the folder rather than to any branch of the folder's code: switching branches leaves it as it is, and `tasks` run from a linked worktree reads and writes the main checkout's.
 _Avoid_: List, project, folder, category, bucket
 
 **Tag**:
@@ -115,7 +115,7 @@ _Avoid_: Instance, event, repetition
 ### Change History
 
 **Change History**:
-The git history of each Repo's tasks.md, kept apart from the Repo's code history and pushed after every write, one entry per write, each naming its Actor. It is kept rather than collapsed, and it is a record of the file rather than the store: the file is what counts, and the history says how it got that way. Only `tasks` writes the file; it is there to be read. A change that is made by hand anyway, outside `tasks`, enters the history as a direct edit whose Actor is unknown, and nothing tries to name one.
+The git history of each Repo's TASKS.md, kept apart from the Repo's code history and pushed after every write, one entry per write, each naming its Actor. It is kept rather than collapsed, and it is a record of the file rather than the store: the file is what counts, and the history says how it got that way. Only `tasks` writes the file; it is there to be read. A change that is made by hand anyway, outside `tasks`, enters the history as a direct edit whose Actor is unknown, and nothing tries to name one.
 _Avoid_: Log, audit log, journal, event stream
 
 **Actor**:

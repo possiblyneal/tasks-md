@@ -50,10 +50,10 @@ func Repeat(dir, actor, id, rule string) error {
 	})
 }
 
-// SeriesOf is the Series on the Task with the id in dir's tasks.md, with its
+// SeriesOf is the Series on the Task with the id in dir's TASKS.md, with its
 // next dates counted from today. It writes nothing.
 func SeriesOf(dir, id string, today time.Time) (Series, error) {
-	text, err := os.ReadFile(filepath.Join(dir, "tasks.md"))
+	text, err := os.ReadFile(filepath.Join(dir, "TASKS.md"))
 	if err != nil {
 		return Series{}, err
 	}

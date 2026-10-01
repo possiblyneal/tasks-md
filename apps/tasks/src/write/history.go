@@ -19,13 +19,13 @@ type Entry struct {
 	Subject string    `json:"subject"`
 }
 
-// HistoryOf is what happened to the Task with the id in dir's tasks.md,
+// HistoryOf is what happened to the Task with the id in dir's TASKS.md,
 // newest first: each write whose subject names ^id, and each direct edit that
 // changed one of the Task's own lines. A Subtask's lines are its own, so a
 // hand edit to a Subtask is drawn on the Subtask alone. A Repo with no tasks
 // history yet answers none. It writes nothing.
 func HistoryOf(dir, id string) ([]Entry, error) {
-	text, err := os.ReadFile(filepath.Join(dir, "tasks.md"))
+	text, err := os.ReadFile(filepath.Join(dir, "TASKS.md"))
 	if err != nil {
 		return nil, err
 	}

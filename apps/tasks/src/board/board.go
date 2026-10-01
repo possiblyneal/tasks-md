@@ -1,5 +1,5 @@
 // Package board is one read of every Repo's Tasks: discover the Repos, parse
-// each tasks.md afresh, work out what a read works out (Blocked, a Task's
+// each TASKS.md afresh, work out what a read works out (Blocked, a Task's
 // parents), and keep what the Narrowing asks for. `tasks list`, `tasks repos`,
 // `tasks lint` and GET /api/state all read through it, so a person and an
 // Agent are answered from the same call.
@@ -250,7 +250,7 @@ func readRepo(r repos.Repo, sort Sort) Repo {
 	out := Repo{Name: r.Name, Path: r.Path, Tasks: []Task{}, Problems: []taskfile.Problem{}, Flags: history.Flags(r.Path)}
 	text, err := os.ReadFile(r.File())
 	if err != nil {
-		out.Problems = append(out.Problems, taskfile.Problem{Message: "cannot read tasks.md: " + unwrapped(err)})
+		out.Problems = append(out.Problems, taskfile.Problem{Message: "cannot read TASKS.md: " + unwrapped(err)})
 		return out
 	}
 	f, problems := taskfile.Parse(string(text))

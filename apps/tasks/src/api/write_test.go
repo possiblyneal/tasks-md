@@ -176,7 +176,7 @@ func TestAStaleWriteIsAConflictAndAnotherTreeIsNot(t *testing.T) {
 	if w := post(t, h, "/api/tasks/m3qa/delete", `{"repo": "house-move"}`); w.Code != http.StatusOK {
 		t.Errorf("a delete answered %d: %s", w.Code, w.Body.String())
 	}
-	text, _ := os.ReadFile(filepath.Join(code, "house-move", "tasks.md"))
+	text, _ := os.ReadFile(filepath.Join(code, "house-move", "TASKS.md"))
 	if strings.Contains(string(text), "m3q") {
 		t.Errorf("the delete left\n%s", text)
 	}

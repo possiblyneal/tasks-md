@@ -1,4 +1,4 @@
-// The board's reads. A Repo's tasks.md changing is what says something
+// The board's reads. A Repo's TASKS.md changing is what says something
 // happened, so a read is polled once a second over HTTP, and the ETag, hashed
 // over the files' modification times, keeps that to a 304 while nothing
 // changes.

@@ -45,11 +45,11 @@ func TestCaptureWritesToTheCallingRepoNotTheBrokersGuess(t *testing.T) {
 		t.Fatalf("tasks capture printed %q, want the new id", out)
 	}
 	want := "- [ ] Call the dentist | inbox #kitchen\n  - id: " + id + "\n  - created: " + today() + "\n  - priority: high\n\n  about the crown\n"
-	if file := read(t, filepath.Join(house, "tasks.md")); !strings.Contains(file, want) {
-		t.Errorf("house-move/tasks.md =\n%s\nwant it to hold\n%s", file, want)
+	if file := read(t, filepath.Join(house, "TASKS.md")); !strings.Contains(file, want) {
+		t.Errorf("house-move/TASKS.md =\n%s\nwant it to hold\n%s", file, want)
 	}
-	if file := read(t, filepath.Join(code, "work", "tasks.md")); file != work {
-		t.Errorf("work/tasks.md was written:\n%s", file)
+	if file := read(t, filepath.Join(code, "work", "TASKS.md")); file != work {
+		t.Errorf("work/TASKS.md was written:\n%s", file)
 	}
 	if got := tasksLog(t, house, "%s|%(trailers:key=Generated-By,valueonly,separator=)")[0]; got != "chore(tasks): add ^"+id+" Call the dentist|claude-code/claude-opus-5-5" {
 		t.Errorf("the capture's commit = %q, want it made as the caller's Actor", got)
@@ -60,8 +60,8 @@ func TestCaptureWritesToTheCallingRepoNotTheBrokersGuess(t *testing.T) {
 	if status, _, errs := run(t, "capture", "-repo", "house-move", "dentist again"); status != 0 {
 		t.Fatalf("tasks capture -repo exited %d: %s", status, errs)
 	}
-	if file := read(t, filepath.Join(code, "work", "tasks.md")); file != work {
-		t.Errorf("work/tasks.md was written:\n%s", file)
+	if file := read(t, filepath.Join(code, "work", "TASKS.md")); file != work {
+		t.Errorf("work/TASKS.md was written:\n%s", file)
 	}
 }
 
@@ -79,8 +79,8 @@ func TestCaptureDryWritesNothing(t *testing.T) {
 			t.Errorf("-dry printed %q, want %q in it", out, want)
 		}
 	}
-	if file := read(t, filepath.Join(code, "house-move", "tasks.md")); file != houseMove {
-		t.Errorf("-dry wrote tasks.md:\n%s", file)
+	if file := read(t, filepath.Join(code, "house-move", "TASKS.md")); file != houseMove {
+		t.Errorf("-dry wrote TASKS.md:\n%s", file)
 	}
 }
 

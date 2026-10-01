@@ -16,7 +16,7 @@ StartLimitBurst=5
 Type=simple
 # Two paths, both placed by hand: the binary scripts/package builds and the
 # static files apps/web builds. There is no third thing to install, because the
-# store is the tasks.md in each Repo.
+# store is the TASKS.md in each Repo.
 ExecStart=%h/.local/bin/tasks api -addr :8080 -web %h/.local/share/tasks/web
 Restart=on-failure
 RestartSec=5

@@ -15,7 +15,7 @@ import (
 // Server is the Actor of the writes nobody asked for: the pass's.
 const Server = "task server"
 
-// Pass brings each Repo's tasks.md up to today before anything reads it or
+// Pass brings each Repo's TASKS.md up to today before anything reads it or
 // writes to it. A Deferred Task whose until date has come moves to Backlog,
 // and an ended Task still carrying a Series has its next Occurrence written
 // and the rule moved onto it. Each Repo with anything due gets one commit,
@@ -28,7 +28,7 @@ func Pass(today time.Time, dirs ...string) {
 	for _, dir := range dirs {
 		// The file is read without the lock first, so a pass with nothing to
 		// do costs a read rather than a commit's worth of git.
-		text, err := os.ReadFile(filepath.Join(dir, "tasks.md"))
+		text, err := os.ReadFile(filepath.Join(dir, "TASKS.md"))
 		if err != nil {
 			continue
 		}

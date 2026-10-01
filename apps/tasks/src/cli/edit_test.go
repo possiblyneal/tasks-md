@@ -100,8 +100,8 @@ func TestEditSetsEveryAttributeAndKeepsUnknownLabels(t *testing.T) {
   - id: st01
   - created: 2026-09-02
 `
-	if got := read(t, filepath.Join(repo, "tasks.md")); got != want {
-		t.Errorf("after the edit, tasks.md =\n%s\nwant\n%s", got, want)
+	if got := read(t, filepath.Join(repo, "TASKS.md")); got != want {
+		t.Errorf("after the edit, TASKS.md =\n%s\nwant\n%s", got, want)
 	}
 	if subjects := tasksLog(t, repo, "%s"); subjects[0] != "chore(tasks): edit ^pp01 Renew both passports" {
 		t.Errorf("the edit committed as %q", subjects[0])
@@ -109,11 +109,11 @@ func TestEditSetsEveryAttributeAndKeepsUnknownLabels(t *testing.T) {
 
 	// An empty value takes the attribute off; one not given is left alone.
 	editing(t, "pp01", "-repo", "errands", "-tag", "", "-why", "", "-blocked-by", "", "-description", "")
-	got := read(t, filepath.Join(repo, "tasks.md"))
+	got := read(t, filepath.Join(repo, "TASKS.md"))
 	if !strings.HasPrefix(got, "# Tasks\n\n- [ ] Renew both passports | deferred\n") ||
 		strings.Contains(got, "why:") || strings.Contains(got, "blocked by:") || strings.Contains(got, "Both expire") ||
 		!strings.Contains(got, "  - mood: grim\n") || !strings.Contains(got, "  - priority: high\n") {
-		t.Errorf("after clearing, tasks.md =\n%s", got)
+		t.Errorf("after clearing, TASKS.md =\n%s", got)
 	}
 }
 
@@ -121,7 +121,7 @@ func TestEditsTheRulesTurnAwayChangeNothing(t *testing.T) {
 	code := gitHome(t, map[string]string{"errands": errands})
 	repo := filepath.Join(code, "errands")
 	withRemote(t, repo)
-	before := read(t, filepath.Join(repo, "tasks.md"))
+	before := read(t, filepath.Join(repo, "TASKS.md"))
 
 	for _, c := range []struct {
 		args   []string
@@ -144,8 +144,8 @@ func TestEditsTheRulesTurnAwayChangeNothing(t *testing.T) {
 			t.Errorf("tasks edit %v exited %d saying %q, want %d saying %q", c.args, status, errs, c.status, c.says)
 		}
 	}
-	if got := read(t, filepath.Join(repo, "tasks.md")); got != before {
-		t.Errorf("a refused edit changed tasks.md to\n%s", got)
+	if got := read(t, filepath.Join(repo, "TASKS.md")); got != before {
+		t.Errorf("a refused edit changed TASKS.md to\n%s", got)
 	}
 }
 
@@ -174,8 +174,8 @@ func TestAStaleTreeIsRefusedWhileAnotherTreeGoesThrough(t *testing.T) {
 	// The van's tree did not change, so its edit goes through.
 	editing(t, "v9t1", "-repo", "house-move", "-version", van, "-title", "Book the big van")
 
-	if got := read(t, filepath.Join(repo, "tasks.md")); strings.Contains(got, "Pack it all") || !strings.Contains(got, "Book the big van") || !strings.Contains(got, "Buy boxes") {
-		t.Errorf("tasks.md =\n%s", got)
+	if got := read(t, filepath.Join(repo, "TASKS.md")); strings.Contains(got, "Pack it all") || !strings.Contains(got, "Book the big van") || !strings.Contains(got, "Buy boxes") {
+		t.Errorf("TASKS.md =\n%s", got)
 	}
 }
 
@@ -190,14 +190,14 @@ func TestDeleteRemovesTheBlockAndItsSubtasks(t *testing.T) {
 	// The van's blocker went with it, and a blocker naming nothing blocks
 	// nothing, so the line goes too rather than leave a lint problem.
 	want := "# Tasks\ncolor: green\n\n- [ ] Book the van | backlog\n  - id: v9t1\n  - created: 2026-09-21\n"
-	if got := read(t, filepath.Join(repo, "tasks.md")); got != want {
-		t.Errorf("after the delete, tasks.md =\n%s\nwant\n%s", got, want)
+	if got := read(t, filepath.Join(repo, "TASKS.md")); got != want {
+		t.Errorf("after the delete, TASKS.md =\n%s\nwant\n%s", got, want)
 	}
 	if subjects := tasksLog(t, repo, "%s"); subjects[0] != "chore(tasks): delete ^m3qa Pack the kitchen" {
 		t.Errorf("the delete committed as %q", subjects[0])
 	}
 	// The history keeps it.
-	if old := git(t, repo, "--git-dir=.tasks.git", "show", "HEAD~1:tasks.md"); !strings.Contains(old, "Wrap glassware") {
+	if old := git(t, repo, "--git-dir=.tasks.git", "show", "HEAD~1:TASKS.md"); !strings.Contains(old, "Wrap glassware") {
 		t.Errorf("the history lost the deleted block:\n%s", old)
 	}
 
@@ -206,7 +206,7 @@ func TestDeleteRemovesTheBlockAndItsSubtasks(t *testing.T) {
 	if status, _, errs := run(t, "delete", "m3qc", "-repo", "house-move"); status != 0 {
 		t.Fatalf("tasks delete exited %d: %s", status, errs)
 	}
-	if got := read(t, filepath.Join(repo, "tasks.md")); !strings.Contains(got, "- [x] Pack the kitchen | done #packing #kitchen\n") {
+	if got := read(t, filepath.Join(repo, "TASKS.md")); !strings.Contains(got, "- [x] Pack the kitchen | done #packing #kitchen\n") {
 		t.Errorf("the parent did not settle:\n%s", got)
 	}
 
@@ -221,7 +221,7 @@ func TestAHandTypedTaskGetsItsIDAndCreatedOnTheNextWrite(t *testing.T) {
 	withRemote(t, repo)
 
 	editing(t, "st01", "-repo", "errands", "-priority", "low")
-	got := read(t, filepath.Join(repo, "tasks.md"))
+	got := read(t, filepath.Join(repo, "TASKS.md"))
 	lines := strings.Split(got, "\n")
 	if lines[2] != "- [ ] Call the bank | inbox" || !anID.MatchString(strings.TrimPrefix(lines[3], "  - id: ")) || lines[4] != "  - created: "+today() {
 		t.Errorf("the hand-typed Task was not given its id and created:\n%s", got)
@@ -245,7 +245,7 @@ func TestTagsCountsAcrossEveryRepoAndRenameIsOneCommitEach(t *testing.T) {
 	if status, _, errs := run(t, "tags", "rename", "kitchen", "admin"); status != 0 {
 		t.Fatalf("tasks tags rename exited %d: %s", status, errs)
 	}
-	house := read(t, filepath.Join(code, "house-move", "tasks.md"))
+	house := read(t, filepath.Join(code, "house-move", "TASKS.md"))
 	if !strings.Contains(house, "| doing #packing #admin\n") || !strings.Contains(house, "| doing #admin\n") || strings.Contains(house, "#kitchen") {
 		t.Errorf("house-move after the rename:\n%s", house)
 	}
@@ -263,7 +263,7 @@ func TestTagsCountsAcrossEveryRepoAndRenameIsOneCommitEach(t *testing.T) {
 	if status, _, errs := run(t, "tags", "rename", "packing", "admin"); status != 0 {
 		t.Fatalf("tasks tags rename exited %d: %s", status, errs)
 	}
-	if house := read(t, filepath.Join(code, "house-move", "tasks.md")); !strings.Contains(house, "| doing #admin\n  - id: m3qa") {
+	if house := read(t, filepath.Join(code, "house-move", "TASKS.md")); !strings.Contains(house, "| doing #admin\n  - id: m3qa") {
 		t.Errorf("house-move after merging Tags:\n%s", house)
 	}
 

@@ -1,4 +1,4 @@
-// Package write is the one write path onto a Repo's tasks.md. Each verb reads
+// Package write is the one write path onto a Repo's TASKS.md. Each verb reads
 // the file, applies Tracking's rules to the Task tree, writes it back through
 // taskfile and hands the text to history, which commits and pushes it. `tasks
 // add`, `tasks move` and their API routes all call here, so a person and an
@@ -77,7 +77,7 @@ var (
 	tagForm   = regexp.MustCompile(`^[^\s#|]+$`)
 )
 
-// Add writes a new top-level Task into dir's tasks.md and names it. It is
+// Add writes a new top-level Task into dir's TASKS.md and names it. It is
 // never stale: it touches no Task already there.
 func Add(dir, actor string, n New) (string, error) {
 	state, err := n.check()
@@ -319,7 +319,7 @@ func parse(text string) (*taskfile.File, error) {
 	f, problems := taskfile.Parse(text)
 	for _, p := range problems {
 		if p.Lost {
-			return nil, Refused{fmt.Sprintf("tasks.md line %d: %s, so a write would drop it; fix it by hand (tasks lint)", p.Line, p.Message)}
+			return nil, Refused{fmt.Sprintf("TASKS.md line %d: %s, so a write would drop it; fix it by hand (tasks lint)", p.Line, p.Message)}
 		}
 	}
 	return f, nil

@@ -36,13 +36,13 @@ func broker(t *testing.T, answer string) *string {
 	return told
 }
 
-// unwritten fails the test when a Repo's tasks.md has changed since files.
+// unwritten fails the test when a Repo's TASKS.md has changed since files.
 func unwritten(t *testing.T, code string, files map[string]string) {
 	t.Helper()
 	for name, text := range files {
-		got, err := os.ReadFile(filepath.Join(code, name, "tasks.md"))
+		got, err := os.ReadFile(filepath.Join(code, name, "TASKS.md"))
 		if err != nil || string(got) != text {
-			t.Errorf("%s/tasks.md was written: %s", name, got)
+			t.Errorf("%s/TASKS.md was written: %s", name, got)
 		}
 	}
 }

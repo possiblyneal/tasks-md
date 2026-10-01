@@ -1,5 +1,5 @@
 // Package history is a Repo's tasks history (ADR 0005): a second git history
-// beside the code's, in `.tasks.git`, tracking tasks.md alone and pushed after
+// beside the code's, in `.tasks.git`, tracking TASKS.md alone and pushed after
 // every write to a `tasks` branch on the Repo's own remote.
 //
 // Write is the one way the file changes through the tracker. It takes the
@@ -29,7 +29,7 @@ import (
 
 const (
 	gitDir = ".tasks.git"
-	file   = "tasks.md"
+	file   = "TASKS.md"
 	branch = "tasks"
 	remote = "origin"
 )
@@ -44,7 +44,7 @@ const (
 // name.
 const DirectEdit = "direct edit"
 
-// Unready is a Repo refusing writes: its tasks.md holds conflict markers, or
+// Unready is a Repo refusing writes: its TASKS.md holds conflict markers, or
 // its tasks history is mid-merge, mid-rebase or on a detached HEAD. A person
 // clears it by hand, and nothing is written until they do.
 type Unready struct{ Reason string }
@@ -56,7 +56,7 @@ func (u Unready) Error() string { return "refusing writes: " + u.Reason }
 // `move ^m3qa to Doing`. A text that comes back unchanged commits nothing.
 type Change func(before string) (after, subject string, err error)
 
-// Write applies change to dir's tasks.md under the Repo's lock and records it
+// Write applies change to dir's TASKS.md under the Repo's lock and records it
 // as one commit authored by the host's git user, carrying the Actor. A push
 // that fails does not fail the write: the commit stays, and Flags says the
 // Repo is not pushed until a later write's push goes through.
@@ -183,7 +183,7 @@ func Log(dir string) ([]Commit, error) {
 	return log, nil
 }
 
-// Show is tasks.md as the commit left it, and "" for no commit at all.
+// Show is TASKS.md as the commit left it, and "" for no commit at all.
 func Show(dir, hash string) (string, error) {
 	if hash == "" {
 		return "", nil
@@ -214,7 +214,7 @@ func ready(dir string) error {
 		if _, err := tasks(dir, "init", "-q", "--initial-branch="+branch); err != nil {
 			return err
 		}
-		// The history sees tasks.md and nothing else in the folder, so its
+		// The history sees TASKS.md and nothing else in the folder, so its
 		// own status is readable by a person.
 		exclude := filepath.Join(dir, gitDir, "info", "exclude")
 		if err := os.WriteFile(exclude, []byte("/*\n!/"+file+"\n"), 0o644); err != nil {
@@ -227,7 +227,7 @@ func ready(dir string) error {
 	return unready(dir)
 }
 
-// ignored appends tasks.md and .tasks.git to the Repo's .gitignore where its
+// ignored appends TASKS.md and .tasks.git to the Repo's .gitignore where its
 // code history does not already ignore them. A folder holding no code has no
 // code history to keep them out of.
 func ignored(dir string) error {
@@ -259,7 +259,7 @@ func ignored(dir string) error {
 // unready says why dir refuses writes, or nil.
 func unready(dir string) error {
 	if text, err := os.ReadFile(filepath.Join(dir, file)); err == nil && conflicted(string(text)) {
-		return Unready{"tasks.md holds conflict markers"}
+		return Unready{"TASKS.md holds conflict markers"}
 	}
 	git := filepath.Join(dir, gitDir)
 	for name, reason := range map[string]string{
@@ -288,7 +288,7 @@ func conflicted(text string) bool {
 	return false
 }
 
-// commit commits tasks.md alone if it differs from the history's last
+// commit commits TASKS.md alone if it differs from the history's last
 // commit, with hooks skipped. Nothing else is ever added to the history's
 // index, so committing the index commits the file alone. The add is forced
 // because the folder's .gitignore, which this history reads too, ignores the
@@ -389,7 +389,7 @@ func scrubbed() []string {
 // replace writes the file whole under a new name and renames it into place,
 // so a reader never sees half of it.
 func replace(path, text string) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".tasks.md.*")
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".TASKS.md.*")
 	if err != nil {
 		return err
 	}
