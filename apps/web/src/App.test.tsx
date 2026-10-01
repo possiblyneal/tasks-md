@@ -450,6 +450,22 @@ test('Delete takes a second tap, then deletes and closes the panel', async () =>
   ])
 })
 
+test('a Delete armed on one Task is not armed on the next one opened', async () => {
+  writesAnswering({ status: 200, body: { id: 'm3qa' } })
+  render(<App />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Wrap glassware' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+  fireEvent.click(screen.getByRole('button', { name: /Pack the kitchen/ }))
+
+  expect(screen.getByRole('button', { name: 'Delete' })).toBeTruthy()
+  expect(
+    screen.queryByRole('button', { name: 'Delete it and its Subtasks' }),
+  ).toBeNull()
+  expect(writes()).toEqual([])
+  // The opened Task is in the address, which the next test would open on.
+  fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+})
+
 // Away from home Wi-Fi the service worker answers with the last board it kept,
 // marked offline: one flag per poll here, the last repeated.
 function away(...offline: boolean[]) {

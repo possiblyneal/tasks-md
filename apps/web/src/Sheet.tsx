@@ -36,6 +36,7 @@ export function Sheet({
   draft,
   repos,
   existing,
+  offline,
   action,
   onSubmit,
   onCancel,
@@ -48,6 +49,8 @@ export function Sheet({
    * since a Task changes State by a move, which holds the rules for it.
    */
   existing: boolean
+  /** Whether the API is out of reach, so submitting could write nothing. */
+  offline: boolean
   /** The word on the button, which is what submitting it does. */
   action: string
   onSubmit: (draft: Draft) => Promise<void>
@@ -250,7 +253,7 @@ export function Sheet({
         <button type="button" onClick={onCancel} disabled={writing}>
           Cancel
         </button>
-        <button type="submit" disabled={writing}>
+        <button type="submit" disabled={writing || offline}>
           {writing ? '…' : action}
         </button>
       </div>
@@ -384,6 +387,13 @@ function Pointers({
           placeholder="https://… or /a/path"
           value={target}
           onChange={(event) => setTarget(event.target.value)}
+          onKeyDown={(event) => {
+            // Enter here collects the pointer; it would otherwise submit the
+            // form without it.
+            if (event.key !== 'Enter') return
+            event.preventDefault()
+            add()
+          }}
         />
         <button type="button" onClick={() => setBrowsing(!browsing)}>
           {browsing ? 'Close' : 'Browse'}

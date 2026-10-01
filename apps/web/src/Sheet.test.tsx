@@ -19,13 +19,14 @@ afterEach(() => {
  * Renders the form on a draft and answers with what submitting it sent. It
  * opens on a Task that exists unless a test says otherwise.
  */
-function opened(fields: Partial<Draft>, existing = true) {
+function opened(fields: Partial<Draft>, existing = true, offline = false) {
   const sent: Draft[] = []
   render(
     <Sheet
       draft={{ ...blank('house-move'), ...fields }}
       repos={['house-move', 'work']}
       existing={existing}
+      offline={offline}
       action="Save"
       onSubmit={(body) => {
         sent.push(body)
@@ -183,6 +184,23 @@ test('an attachment typed on the sheet comes back with the body', () => {
   })
   fireEvent.click(screen.getByRole('button', { name: 'Attach' }))
   expect(sheet.submit().attach).toEqual(['/home/neal/receipt.pdf'])
+})
+
+test('Enter in the attachment box attaches rather than submitting', () => {
+  const sheet = opened({ title: 'Buy milk' })
+  const box = screen.getByLabelText('New attachment')
+  fireEvent.change(box, { target: { value: '/receipt.pdf' } })
+  fireEvent.keyDown(box, { key: 'Enter' })
+  expect(screen.getByText('/receipt.pdf')).toBeTruthy()
+  expect(sheet.submit().attach).toEqual(['/receipt.pdf'])
+})
+
+test('offline, the form cannot be submitted', () => {
+  opened({ title: 'Buy milk' }, true, true)
+  expect(screen.getByRole('button', { name: 'Save' })).toHaveProperty(
+    'disabled',
+    true,
+  )
 })
 
 test('a collected attachment is taken off before anything is written', () => {

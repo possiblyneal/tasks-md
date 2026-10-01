@@ -120,7 +120,8 @@ iPhone's home screen as a PWA, and offline shows the last board read.
   tree is read from the wide read in file order. A card without an id is not
   opened. Edit opens the form on the Task; Delete asks with a second tap
   rather than a browser dialog, deletes the Task and its Subtasks, and closes
-  the panel.
+  the panel. Each Task opens on a fresh panel, so nothing armed or read for
+  one is drawn on the next.
 - **One form adds and edits.** Add on the board opens it on a blank Task in
   the first Repo; Edit opens it on the Task, in the same scrim and panel.
   It carries Title, Description, Why, Acceptance, Tags, Deadline, Estimate
@@ -190,9 +191,9 @@ up` or why it refuses writes, as the read carries them in `flags`.
   intercepted. The page is offline while the last poll was answered from the
   cache or never reached a server (a `TypeError`); it says so in a
   `role="status"` line and disables every write control: no drag, no hold,
-  no Move to, no Add, no Edit, Delete or Break down in the panel, and no
-  dump or question in the box; a breakdown already open answers and approves
-  nothing. A write control added later reads the same `offline`. The next
+  no Move to, no Add, no Edit, Delete or Break down in the panel, no
+  submitting a form already open, and no dump or question in the box; a
+  breakdown already open answers and approves nothing. A write control added later reads the same `offline`. The next
   poll that
   reaches the server ends it, with no reload.
 - **The worker is a module, and every chunk the page loads is in

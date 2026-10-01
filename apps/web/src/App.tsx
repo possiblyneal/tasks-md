@@ -273,6 +273,9 @@ export function App() {
       )}
       {found && wide.board && !form && !breaking && (
         <Panel
+          // Each Task opens on a fresh panel, so an armed Delete, a refusal or
+          // another Task's history is never carried over to it.
+          key={`${found.repo.name}/${found.task.id}`}
           repo={found.repo}
           task={found.task}
           today={wide.board.today}
@@ -306,6 +309,7 @@ export function App() {
               draft={form.draft}
               repos={wide.board.repos.map((repo) => repo.name)}
               existing={form.id !== undefined}
+              offline={offline}
               action={form.id ? 'Save' : 'Add'}
               onSubmit={save}
               onCancel={() => setForm(null)}
