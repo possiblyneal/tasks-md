@@ -86,7 +86,9 @@ func list(args []string, stdout, stderr io.Writer) int {
 	if *asJSON {
 		enc := json.NewEncoder(stdout)
 		enc.SetIndent("", "  ")
-		if err := enc.Encode(board.Of(read, errs)); err != nil {
+		// Read has already refused a Repo there is not, so Weekly cannot.
+		weeks, _ := board.Weekly(found, n, now())
+		if err := enc.Encode(board.Of(read, weeks, errs)); err != nil {
 			fmt.Fprintf(stderr, "tasks list: %v\n", err)
 			return 1
 		}
