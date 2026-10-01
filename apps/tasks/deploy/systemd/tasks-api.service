@@ -1,0 +1,40 @@
+[Unit]
+Description=tasks api: the json and the browser client, on the lan
+Documentation=https://github.com/possiblyneal/tasks-md
+# Nothing to order against: `-addr :8080` is a wildcard bind, which needs no
+# address to exist yet. A drop-in naming a specific address does need one, and
+# the user manager has no network-online.target to wait on -- it is a system
+# target -- so such a drop-in wants Restart to carry it instead.
+
+# Bound the restart loop. A permanent failure -- a binary that is not there, a
+# port already taken -- should leave the unit failed and visible rather than
+# retrying until somebody notices the logs.
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# Two paths, both placed by hand: the binary scripts/package builds and the
+# static files apps/web builds. There is no third thing to install, because the
+# store is the TASKS.md in each Repo.
+ExecStart=%h/.local/bin/tasks api -addr :8080 -web %h/.local/share/tasks/web
+Restart=on-failure
+RestartSec=5
+
+# No environment of its own, deliberately: the service reads the roots from
+# ~/.config/tasks/config, exactly what a verb run at the terminal reads, so the
+# browser and the terminal see the same Repos.
+
+# No authentication, per ADR 0003: the listener is for the LAN, and the network
+# is the boundary. `:8080` is a wildcard bind, so the host's own interfaces are
+# that boundary and nothing here narrows it. Off-LAN reach -- a host that grows
+# an interface facing further than the LAN -- is that record's first re-check
+# trigger, and it arrives by topology as readily as by decision.
+#
+# The address to give out is https://tasks.lan: Traefik on `server` ends TLS
+# there with the Homelab CA `*.lan` leaf and forwards to this port. Plain http
+# on :8080 still answers, but it is not the address to use: a service worker,
+# and so the installed board, runs only over HTTPS.
+
+[Install]
+WantedBy=default.target

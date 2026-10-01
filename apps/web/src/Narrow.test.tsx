@@ -1,144 +1,155 @@
 // @vitest-environment jsdom
 
-// The one thing the controls do that is not "set a field": a picker keeps a
-// narrowing the client cannot name, rather than rendering blank over a list
-// that is still narrowed to it.
+// Narrowing the board: Repo chips, Tag chips, one search box and one sort
+// picker. None of them is worked out in the browser: each one goes to the
+// server in the query string, so the lanes hold what `tasks list` would print
+// under the same flags. The chips are drawn from the wide read, so narrowing
+// never takes away the chip that would undo it.
 
 import {
   cleanup,
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from '@testing-library/react'
-import { afterEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
-import { Narrow, Search } from './Narrow'
-import { drawnKeys } from './rank'
-import { OFFERED_NOTHING, WIDE, type Offered } from './state'
+import { App } from './App'
+import { answeringBy, asked, BOARD, task } from './testing'
 
-afterEach(cleanup)
+const [HOUSE, WORK] = BOARD.repos
+if (!HOUSE || !WORK) throw new Error('BOARD has two Repos')
 
-const OFFERED: Offered = {
-  ...OFFERED_NOTHING,
-  lists: [{ id: 'l1', name: 'Home', color: 'blue', count: 2 }],
-  tags: [{ id: 't1', name: 'errand', color: 'red', count: 1 }],
-  sorts: ['title', 'deadline'],
-  colors: ['blue', 'red'],
-  snoozes: ['1h', '1d'],
-}
+// What the server answers under ?repo=work: that Repo and nothing else.
+const ONLY_WORK = { ...BOARD, repos: [WORK] }
 
-function shown(narrowing = WIDE) {
-  const onChange = vi.fn()
-  render(<Narrow narrowing={narrowing} offered={OFFERED} onChange={onChange} />)
-  return onChange
-}
-
-// Five served sets arrive under one prop now, so reading the wrong one off it
-// is a mistake that can be made. This says which set feeds the sort.
-test('the sort offers the orders the store served and nothing else', () => {
-  shown()
-  const picker = screen.getByLabelText('Sort') as HTMLSelectElement
-  expect([...picker.options].map((o) => o.value)).toEqual([
-    '',
-    'title',
-    'deadline',
-  ])
+beforeEach(() => {
+  asked.length = 0
+  vi.stubGlobal('fetch', answeringBy({ '?repo=work': ONLY_WORK }))
 })
 
-test('a List deleted elsewhere stays on the picker under its own id', () => {
-  shown({ ...WIDE, list: 'gone' })
-  const picker = screen.getByLabelText('List') as HTMLSelectElement
-  expect(picker.value).toBe('gone')
-  // Under the id alone, with no count beside it: the store never said how many
-  // Tasks are in it, and a zero here would be the client making one up.
-  expect([...picker.options].map((o) => o.textContent)).toContain('gone')
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+  window.history.replaceState(null, '', '/')
 })
 
-// The Tags are switches rather than a picker, and the rule is the same one: a
-// Tag that went away while the list was narrowed to it is still the thing to
-// turn off, so it is drawn under its id rather than leaving the list narrowed
-// by something with nothing on the screen to undo it.
-test('a Tag deleted elsewhere stays on as a switch under its own id', () => {
-  shown({ ...WIDE, tags: ['gone'] })
-  const gone = screen.getByRole('button', { name: 'gone' })
-  expect(gone.getAttribute('aria-pressed')).toBe('true')
+const group = (name: string) => within(screen.getByRole('group', { name }))
+const lane = (name: string) => within(screen.getByRole('region', { name }))
+const urls = () => asked.map((a) => a.url)
+
+test('a Repo chip narrows the lanes to what the server read for it', async () => {
+  render(<App />)
+  await screen.findByText('Wrap glassware')
+
+  const chip = group('Repos').getByRole('button', { name: /^work/ })
+  expect(chip.getAttribute('aria-pressed')).toBe('false')
+  fireEvent.click(chip)
+
+  await waitFor(() => expect(screen.queryByText('Wrap glassware')).toBeNull())
+  expect(urls()).toContain('/api/state?repo=work')
+  expect(lane('Inbox').getByText('Write the report')).toBeDefined()
+  expect(chip.getAttribute('aria-pressed')).toBe('true')
+  // The other Repo's chip is still there to switch to: chips come from the
+  // wide read, not the narrowed one.
+  expect(
+    group('Repos').getByRole('button', { name: /^house-move/ }),
+  ).toBeDefined()
+
+  // Tapped again, it lets go, and the board is the wide read again.
+  fireEvent.click(chip)
+  expect(await screen.findByText('Wrap glassware')).toBeDefined()
+  expect(chip.getAttribute('aria-pressed')).toBe('false')
 })
 
-// Any of them, not another narrowing on top: a Tag switched on is added to the
-// set the route is asked under rather than replacing what is already there.
-test('a Tag switched on is added to the set rather than replacing it', () => {
-  const onChange = shown({ ...WIDE, tags: ['other'] })
-  fireEvent.click(screen.getByRole('button', { name: 'errand (1)' }))
-  expect(onChange).toHaveBeenCalledWith({ ...WIDE, tags: ['other', 't1'] })
+test('a Repo whose file has problems is flagged on its chip', async () => {
+  render(<App />)
+  await screen.findByText('Wrap glassware')
+
+  expect(
+    group('Repos').getByRole('button', { name: 'work, has problems' }),
+  ).toBeDefined()
+  expect(
+    group('Repos').getByRole('button', { name: 'house-move' }),
+  ).toBeDefined()
 })
 
-test('a Tag switched off leaves the others on', () => {
-  const onChange = shown({ ...WIDE, tags: ['other', 't1'] })
-  fireEvent.click(screen.getByRole('button', { name: 'errand (1)' }))
-  expect(onChange).toHaveBeenCalledWith({ ...WIDE, tags: ['other'] })
+// Several Tags widen within the field, as `-tag` repeated does.
+test('Tag chips are any-of, each one another tag in the query', async () => {
+  render(<App />)
+  await screen.findByText('Wrap glassware')
+
+  fireEvent.click(group('Tags').getByRole('button', { name: '#fragile' }))
+  await waitFor(() => expect(urls()).toContain('/api/state?tag=fragile'))
+  fireEvent.click(group('Tags').getByRole('button', { name: '#van' }))
+  await waitFor(() =>
+    expect(urls()).toContain('/api/state?tag=fragile&tag=van'),
+  )
 })
 
-test('a picker offers each Collection once and no more', () => {
-  shown({ ...WIDE, list: 'l1' })
-  const picker = screen.getByLabelText('List') as HTMLSelectElement
-  expect([...picker.options].map((o) => o.value)).toEqual(['', 'l1'])
+test('the search box asks the server over every lane', async () => {
+  vi.stubGlobal(
+    'fetch',
+    answeringBy({
+      '?search=van': {
+        ...BOARD,
+        repos: [
+          {
+            ...HOUSE,
+            tasks: [task({ title: 'Book the van', state: 'backlog' })],
+          },
+          { ...WORK, tasks: [] },
+        ],
+      },
+    }),
+  )
+  render(<App />)
+  await screen.findByText('Wrap glassware')
+
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Search' }), {
+    target: { value: 'van' },
+  })
+
+  await waitFor(() => expect(screen.queryByText('Wrap glassware')).toBeNull())
+  expect(urls()).toContain('/api/state?search=van')
+  expect(lane('Backlog').getByText('Book the van')).toBeDefined()
 })
 
-test('picking nothing widens the narrowing back out', () => {
-  const onChange = shown({ ...WIDE, list: 'l1' })
-  fireEvent.change(screen.getByLabelText('List'), { target: { value: '' } })
-  expect(onChange).toHaveBeenCalledWith({ ...WIDE, list: '' })
+test('the sort picker offers the served sorts and sends the one picked', async () => {
+  render(<App />)
+  await screen.findByText('Wrap glassware')
+
+  const picker = screen.getByRole('combobox', { name: 'Sort' })
+  expect(
+    within(picker)
+      .getAllByRole('option')
+      .map((o) => o.textContent),
+  ).toEqual(BOARD.sorts)
+  expect((picker as HTMLSelectElement).value).toBe('file')
+
+  fireEvent.change(picker, { target: { value: 'deadline' } })
+  await waitFor(() => expect(urls()).toContain('/api/state?sort=deadline'))
+
+  // File order is the server's own order, so it is the bare path again.
+  asked.length = 0
+  fireEvent.change(picker, { target: { value: 'file' } })
+  await waitFor(() => expect(asked.length).toBeGreaterThan(0))
+  expect(urls().every((url) => url === '/api/state')).toBe(true)
 })
 
-// Each keystroke is a new narrowing, so there is no timer between the box and
-// the read. The box is drawn apart from the rest of the controls, because it
-// belongs over the list rather than among the filtering.
-test('each character typed is its own narrowing', () => {
-  const onChange = vi.fn()
-  render(<Search value="" onChange={onChange} />)
-  fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'fe' } })
-  expect(onChange).toHaveBeenCalledWith('fe')
-})
+// Blocked is in, out, or all there is, as `-unblocked` and `-blocked` say.
+test('the Blocked picker asks for Blocked Tasks alone or leaves them out', async () => {
+  render(<App />)
+  await screen.findByText('Wrap glassware')
 
-test('showing everything is one toggle and not four', () => {
-  const onChange = shown()
-  fireEvent.click(screen.getByRole('button', { name: 'Show everything' }))
-  expect(onChange).toHaveBeenCalledWith({ ...WIDE, all: true })
-})
+  const picker = screen.getByRole('combobox', { name: 'Blocked' })
+  expect((picker as HTMLSelectElement).value).toBe('')
 
-// The same button is the way back, so it reads the narrowing it is given
-// rather than only ever asking for everything.
-test('showing everything again narrows back to the everyday view', () => {
-  const onChange = shown({ ...WIDE, all: true })
-  fireEvent.click(screen.getByRole('button', { name: 'Everything shown' }))
-  expect(onChange).toHaveBeenCalledWith({ ...WIDE, all: false })
-})
+  fireEvent.change(picker, { target: { value: 'only' } })
+  await waitFor(() => expect(urls()).toContain('/api/state?blocked=true'))
 
-// The controls are unmounted whenever another screen is open, and the Tag order
-// has to survive that: somebody who opens a Task and comes back is looking for
-// the Tag where they last saw it. Thirty Tags drawn twice would agree by
-// chance about once in 10^32 reads, so an order that matches is an order that
-// was not redrawn.
-test('the Tag order survives the controls being unmounted', () => {
-  drawnKeys.clear()
-  const many: Offered = {
-    ...OFFERED,
-    tags: Array.from({ length: 30 }, (_, at) => ({
-      id: `t${at}`,
-      name: `tag${at}`,
-      color: 'red',
-      count: at % 5,
-    })),
-  }
-  const order = () => {
-    render(<Narrow narrowing={WIDE} offered={many} onChange={vi.fn()} />)
-    const group = screen.getByRole('group', { name: 'Tags' })
-    const names = within(group)
-      .getAllByRole('button')
-      .map((one) => one.textContent)
-    cleanup()
-    return names
-  }
-  expect(order()).toEqual(order())
+  fireEvent.change(picker, { target: { value: 'out' } })
+  await waitFor(() => expect(urls()).toContain('/api/state?unblocked=true'))
 })

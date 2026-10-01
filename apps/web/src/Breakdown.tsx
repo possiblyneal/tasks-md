@@ -2,23 +2,31 @@
 // know, and the Subtasks it proposes.
 //
 // A turn writes nothing. Everything the Broker said lives here until somebody
-// approves it, and approving is ordinary Subtask writes, one per ticked
-// proposal. A breakdown backed out of leaves nothing behind, which is the same
-// gate the sheet is for a dump.
+// approves it, and approving is one write of every ticked proposal. A
+// breakdown backed out of leaves nothing behind, which is the same gate the
+// form is for a dump.
 
 import { useEffect, useState } from 'react'
 
 import { sentence } from './api'
 import type { Task } from './state'
-import { addSubtask, breakdown, type Proposal, type QA } from './write'
+import { addSubtasks, breakdown, type Proposal, type QA } from './write'
 
 export function Breakdown({
+  repo,
   task,
+  offline,
   onBack,
 }: {
+  repo: string
   task: Task
+  /** Offline, what came back can still be read, but nothing is answered or approved. */
+  offline: boolean
   onBack: () => void
 }) {
+  // The tree as it was when the breakdown opened. Approving is refused if it
+  // has changed since, rather than writing under a Task nobody was shown.
+  const [version] = useState(task.version)
   // Everything already asked and answered, carried into every turn: the Broker
   // holds nothing between calls, so this is the whole of the conversation.
   const [answered, setAnswered] = useState<QA[]>([])
@@ -36,10 +44,13 @@ export function Breakdown({
   // than left blank, because a turn is a call to the Broker and slow enough to
   // look like nothing happening. Whoever asks for a turn is what says the wait
   // has started: this screen opens waiting, so the first turn has nothing to
-  // set before it is made.
+  // set before it is made. What was said counts as answered only once the
+  // Broker has heard it; a failed turn leaves the questions and replies drawn
+  // for asking again.
   const turn = (said: QA[]) => {
-    breakdown(task.id, said)
+    breakdown(repo, task.id, said)
       .then((step) => {
+        setAnswered(said)
         // Proposals win over questions. `POST /api/breakdown` carries both
         // whole and ranks neither, so the order is this screen's to choose:
         // the two are alternatives, and a turn carrying both is the Broker
@@ -84,30 +95,19 @@ export function Breakdown({
         answer: replies[at] ?? '',
       })),
     ]
-    setAnswered(said)
-    setAsking([])
     setWaiting(true)
     setError(null)
     turn(said)
   }
 
-  // The ticked ones, one write each, under the Lease each of those writes takes
-  // for itself. A write that is refused stops the rest: what landed is on the
-  // list a poll later, and saying which one stopped is the API's own sentence.
-  //
-  // Each one that lands is unticked before the next is tried, so the button
-  // afterwards offers only what did not. Pressing it again on the whole list
-  // would write the ones that already landed a second time, and the store has
-  // no reason to refuse a Subtask for saying what another one says.
+  // The ticked ones, as one write: every one lands or none does, so a refusal
+  // leaves the ticks as they were and pressing again cannot write one twice.
   const approve = async () => {
     setWaiting(true)
     setError(null)
     try {
-      for (const [at, proposal] of (proposals ?? []).entries()) {
-        if (!approved.includes(at)) continue
-        await addSubtask(task.id, proposal)
-        setApproved((was) => was.filter((other) => other !== at))
-      }
+      const ticked = (proposals ?? []).filter((_, at) => approved.includes(at))
+      await addSubtasks(repo, task.id, version, ticked)
       onBack()
     } catch (caught) {
       setError(sentence(caught))
@@ -152,7 +152,9 @@ export function Breakdown({
             </label>
           ))}
           <div className="buttons">
-            <button type="submit">Answer</button>
+            <button type="submit" disabled={offline}>
+              Answer
+            </button>
           </div>
         </form>
       )}
@@ -218,7 +220,7 @@ export function Breakdown({
             <button
               type="button"
               onClick={() => void approve()}
-              disabled={approved.length === 0}
+              disabled={offline || approved.length === 0}
             >
               Add {approved.length}
             </button>

@@ -3,10 +3,37 @@
   color-scheme: light dark;
   font-family: system-ui, sans-serif;
   font-size: 16px;
+
+  /* The colors, as tokens, so light and dark are one block each and follow
+     the OS. */
+  --bg: #f6f5f3;
+  --fg: #1c1b1a;
+  --surface: #ffffff;
+  --line: color-mix(in srgb, var(--fg) 15%, transparent);
+  --accent: #2659c9;
+  --on-accent: #ffffff;
+  --danger: #b42318;
+  --warn: #a15c00;
+  --scrim: rgb(0 0 0 / 40%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #151515;
+    --fg: #e8e6e3;
+    --surface: #222221;
+    --accent: #7aa7ff;
+    --on-accent: #10131a;
+    --danger: #ff8a7a;
+    --warn: #f2b84b;
+    --scrim: rgb(0 0 0 / 60%);
+  }
 }
 
 body {
   margin: 0;
+  background: var(--bg);
+  color: var(--fg);
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
     env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
@@ -26,24 +53,6 @@ body {
   border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
 }
 
-/* The title, with the marks pushed to the end of the same line. */
-.said {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-/* One line, with the rest of a long title ellipsed. The `overflow: hidden` is
-   what `text-overflow` clips against, and it is also what lets the box narrow
-   at all: a flex item's automatic minimum is its content, except that an
-   overflow other than `visible` takes it to zero. So this needs no
-   `min-width: 0` beside it, and adding one would read as though it did. */
-.titled {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* What a Task says, in smaller and dimmer type than its title. */
 .lines {
   overflow-wrap: anywhere;
@@ -51,24 +60,9 @@ body {
   font-size: 0.85rem;
 }
 
-/* Two lines of it and then clipped, in a row and nowhere else: a row is a way
-   of finding the Task rather than of reading it, and the whole of it is a tap
-   away. Everywhere else the words are there to be read before something is
-   decided on them, and half of a description is worse than none.
-   `line-clamp` is what clips it; the `-webkit-` pair beside it is the same
-   property under the name every browser still requires to honour it. */
-button.row .lines {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  line-clamp: 2;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-}
-
-/* When it was created, its Deadline, the Lists it is filed under, and the
-   clip. They wrap rather than shrink, the way the controls above the list do.
-   Wrapping is between them, so a single long one — an unspaced List name, or
-   an instant `day` could not read — breaks inside itself as well. */
+/* The small facts under a title: a card's Repo, Tags, Deadline and whether it
+   is Blocked. They wrap rather than shrink, and a single long one breaks
+   inside itself as well. */
 .facts {
   display: flex;
   flex-wrap: wrap;
@@ -76,32 +70,6 @@ button.row .lines {
   gap: 0.15rem 0.6rem;
   opacity: 0.6;
   font-size: 0.75rem;
-}
-
-/* A row is a tap that opens the Task, so it is a button: the tap target is the
-   whole row rather than the words in it, and a keyboard reaches it.
-
-   It stacks what it says rather than sitting on one line: the title across the
-   top, then the description, then the facts. Still one tap target, and taller
-   than 44px rather than shorter. */
-button.row {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.15rem;
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
-  /* A press held on a row opens its verbs, and selecting the title instead is
-     the platform's idea of what holding means rather than this one's. */
-  user-select: none;
-  -webkit-user-select: none;
-  width: 100%;
-  border-left: 0;
-  border-right: 0;
-  border-top: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
 }
 
 .marks {
@@ -116,9 +84,23 @@ button.row {
 }
 
 /* The box: the front door, so it is above the list and not behind a tap. */
+/* The box: pinned under the board, within a thumb's reach. */
 .box {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  position: fixed;
+  inset: auto 0 0;
+  padding: 0.5rem 1rem calc(0.5rem + env(safe-area-inset-bottom));
+  border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  background: var(--bg);
+}
+
+.box-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.box-row .dump {
+  flex: 1;
+  min-width: 0;
 }
 
 .dump {
@@ -143,49 +125,10 @@ button.row {
 }
 
 .answer {
-  margin: 0.75rem 0 0;
+  max-height: 40dvh;
+  overflow-y: auto;
+  margin: 0 0 0.5rem;
   white-space: pre-wrap;
-}
-
-/* The controls over the list. Three across a phone would take each one under
-   the 44px floor, so they wrap instead of shrinking, and each keeps its own
-   height rather than inheriting the row's. */
-.narrow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
-}
-
-.control {
-  flex: 1 1 8rem;
-  min-height: 44px;
-  padding: 0.5rem;
-  font: inherit;
-}
-
-/* The Tags, each a switch. They take a line of their own below the rest of the
-   controls because there may be many and they wrap; a Tag is a word and does
-   not want the 8rem the pickers beside it claim. */
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  flex-basis: 100%;
-}
-
-.tags .control {
-  flex: 0 0 auto;
-  padding: 0.5rem 0.75rem;
-}
-
-/* Show everything is a toggle, and there is no hover to say which way it is
-   set, so it is filled in when it is on. aria-pressed says it to a reader.
-   The Tag switches are the same, and read the same way. */
-.control.on {
-  background: currentColor;
-  color: Canvas;
 }
 
 /* The add sheet: what the broker read, open for correction. */
@@ -256,8 +199,8 @@ button.row {
   overflow-wrap: anywhere;
 }
 
-/* The detail and activity screens. Both are a column of a phone's width with
-   nothing beside it, which is what one thumb has room for. */
+/* The breakdown screen: a column of a phone's width with nothing beside it,
+   which is what one thumb has room for. */
 .detail {
   padding: 0.75rem 1rem;
 }
@@ -271,120 +214,6 @@ button.row {
   font-size: 1rem;
   margin: 1.5rem 0 0.5rem;
   opacity: 0.7;
-}
-
-.carried {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.25rem 0.75rem;
-  margin: 0.75rem 0 0;
-}
-
-.carried dt {
-  font-size: 0.8rem;
-  opacity: 0.7;
-}
-
-.carried dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.log {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.entry {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.5rem;
-  min-height: 44px;
-  padding: 0.25rem 0;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
-}
-
-/* An entry that opens the Task it is about. It is a button because pressing it
-   is what it is, and it is drawn as the row rather than as a control: the log
-   is a record to read down, and forty buttons in a column would read as a
-   menu. The target is the whole row and not a word in it, so it carries the
-   44px itself: the row's own 44px is the row's, and a flex child laid out on
-   its baseline is as tall as its text rather than as tall as what holds it. */
-.entry-open {
-  display: flex;
-  flex: 1;
-  flex-wrap: wrap;
-  align-items: baseline;
-  align-content: center;
-  gap: 0.5rem;
-  min-height: 44px;
-  padding: 0;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-.entry-open:hover,
-.entry-open:focus-visible {
-  text-decoration: underline;
-}
-
-.did {
-  font-variant: small-caps;
-}
-
-.about {
-  opacity: 0.8;
-}
-
-.who {
-  margin-left: auto;
-}
-
-/* The harness an Agent ran under, beside the model it was. The two halves are
-   drawn apart so the log says which agent a model was acting as. */
-.harness {
-  opacity: 0.6;
-  font-size: 0.8rem;
-}
-
-.when {
-  opacity: 0.6;
-  font-size: 0.8rem;
-  width: 100%;
-}
-
-/* The verbs a press held on a row opens, under the row they are about. They
-   wrap rather than shrink: five across a phone is under the 44px floor. */
-.verbs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-}
-
-.verbs button {
-  flex: 1 0 30%;
-  min-height: 44px;
-  font: inherit;
-}
-
-/* One date of a Series: the date, what was done to it, and the three marks.
-   It wraps rather than shrinks, because three buttons and a date across a
-   phone would otherwise take the buttons under the 44px floor. */
-.date {
-  flex-wrap: wrap;
-  padding: 0.5rem 1rem;
-}
-
-.date .buttons {
-  flex: 1 1 100%;
-  margin-top: 0;
 }
 
 /* A remark beside a control rather than a thing to act on: what the control
@@ -402,100 +231,348 @@ button.row {
   overflow-wrap: anywhere;
 }
 
-/* Three panes at a desk, one column on a phone, and one component tree for
-   both. Nothing measures a width in JavaScript: what is on the screen is the
-   same elements at every size, and this is the whole of what decides the shape.
-
-   The panes are filtering, the Tasks with the search over them, and the Task
-   that is selected. A Task is selected by tapping it, once, and the selection
-   is what both layouts draw. */
-.panes {
-  display: flex;
-  flex-direction: column;
+/* The board: six State lanes side by side. On a phone each is most of a
+   screen wide, scrolled across with one thumb and snapping to a lane, with the
+   next one's edge in view; at a desk all six fit across. */
+.board {
+  /* Room under the last card for the box pinned over it. */
+  padding: 0.5rem 0 6rem;
 }
 
-.pane {
+.problems {
+  margin: 0 1rem 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  font-size: 0.85rem;
+}
+
+.problems h2 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.problems ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1rem;
+  overflow-wrap: anywhere;
+}
+
+/* The weekly metrics: this week in one line, the twelve under it. */
+.metrics {
+  margin: 0 1rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.metrics summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.metrics table {
+  width: 100%;
+  max-width: 28rem;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.metrics th,
+.metrics td {
+  padding: 0.2rem 0.4rem;
+  text-align: end;
+}
+
+.metrics th[scope='row'],
+.metrics thead th:first-child {
+  text-align: start;
+  font-weight: normal;
+}
+
+.lanes {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0 1rem 1rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+
+.lane {
+  flex: 0 0 86vw;
+  min-width: 0;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.lane h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.lane h2 small {
+  opacity: 0.6;
+}
+
+@media (min-width: 64rem) {
+  .lanes {
+    overflow-x: visible;
+    scroll-snap-type: none;
+  }
+
+  .lane {
+    flex: 1 1 0;
+  }
+}
+
+/* A card's edge is its Repo's Color, so two Repos on one lane tell apart. The
+   whole card opens it: the title's button is stretched over it. */
+.card {
+  position: relative;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  border-inline-start: 4px solid
+    color-mix(in srgb, currentColor 30%, transparent);
+  box-sizing: border-box;
+  /* A held card opens Move to, not the phone's own menu or a selection. */
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.parents {
+  opacity: 0.6;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.card-title {
+  overflow-wrap: anywhere;
+}
+
+button.card-title {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+}
+
+button.card-title::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.repo {
+  font-weight: 600;
+}
+
+.blocked {
+  color: var(--danger);
+}
+
+/* A Deadline on the day, and one past it, against the host's today. */
+.today {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.overdue {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* Said to a screen reader and not drawn. */
+.unseen {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The narrowing controls, above the lanes where a thumb reaches them. The chip
+   rows scroll across rather than wrap, so they never push the lanes down. */
+.narrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0 1rem 0.75rem;
+}
+
+.control {
+  min-height: 44px;
+  padding: 0 0.75rem;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.narrow input {
+  flex: 1 1 12rem;
   min-width: 0;
 }
 
-/* On a phone the selected Task is shown instead of the list rather than beside
-   it: a third of a phone is not a pane. `Detail`'s own Back is what clears the
-   selection, which is the same button at both widths.
-
-   One column puts the panes in the order they are written, which would stack
-   the filtering in front of the box. The box is the front door and a dump is
-   the most frequent thing anybody does here, so the middle pane gives up being
-   a box of its own and the column orders its children directly: the box, then
-   the filtering, then the list the filtering is about. At a desk the panes are
-   columns and none of this applies. */
-@media (max-width: 59.99rem) {
-  .panes > .middle {
-    display: contents;
-  }
-
-  .panes > .filters {
-    order: 1;
-  }
-
-  .panes > .middle > * {
-    order: 2;
-  }
-
-  .panes > .middle > .box {
-    order: 0;
-  }
-
-  .panes.showing > .filters,
-  .panes.showing > .middle > * {
-    display: none;
-  }
-}
-
-/* 60rem is where a third of the screen is still wider than a phone, so a pane
-   is a column somebody can read rather than a squeezed one. */
-@media (min-width: 60rem) {
-  .panes {
-    flex-direction: row;
-    align-items: stretch;
-    height: 100vh;
-  }
-
-  /* Each pane scrolls on its own: the list is long, and the Task beside it
-     should not travel with it. */
-  .pane {
-    overflow-y: auto;
-  }
-
-  .filters {
-    flex: 0 0 16rem;
-    border-right: 1px solid color-mix(in srgb, currentColor 15%, transparent);
-  }
-
-  /* The controls stack down the pane instead of wrapping across it, and each
-     takes the width it has rather than the 8rem it claims in a row. */
-  .filters .narrow {
-    flex-direction: column;
-    border-bottom: 0;
-  }
-
-  .filters .control {
-    flex: 0 0 auto;
-  }
-
-  .middle {
-    flex: 1 1 0;
-  }
-
-  .opened {
-    flex: 0 0 26rem;
-    border-left: 1px solid color-mix(in srgb, currentColor 15%, transparent);
-  }
-}
-
-/* The search box is the width of what it searches, wherever it is drawn. */
-.control.search {
-  display: block;
+.chips {
+  display: flex;
+  gap: 0.5rem;
   width: 100%;
+  overflow-x: auto;
+}
+
+.chip {
+  flex: none;
+  min-height: 44px;
+  padding: 0 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+}
+
+.chip[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.flag {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.chip[aria-pressed='true'] .flag {
+  color: inherit;
+}
+
+/* The panel: a bottom sheet most of a phone's height, and a side panel at a
+   desk, over a scrim that closes it when tapped. */
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+}
+
+.panel {
+  position: fixed;
+  inset: auto 0 0;
+  height: 88dvh;
+  overflow-y: auto;
+  padding: 0 1rem calc(1rem + env(safe-area-inset-bottom));
+  border-radius: 1rem 1rem 0 0;
+  background: var(--surface);
   box-sizing: border-box;
-  border-radius: 0;
+}
+
+@media (min-width: 64rem) {
+  .panel {
+    inset: 0 0 0 auto;
+    width: 28rem;
+    height: auto;
+    border-radius: 0;
+  }
+}
+
+.panel-bar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  background: var(--surface);
+}
+
+/* A parent above the title, or a Subtask below it: a Task to open next. */
+.parent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+}
+
+.parent-title {
+  overflow-wrap: anywhere;
+}
+
+.attrs {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0.5rem 0;
+}
+
+.attrs dt {
+  opacity: 0.7;
+}
+
+.attrs dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.said {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Move to: the six States in a sheet from the bottom, within a thumb's reach. */
+.scrim {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  background: color-mix(in srgb, black 40%, transparent);
+}
+
+.move-to {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+  background: Canvas;
+  color: CanvasText;
+  box-sizing: border-box;
+}
+
+.move-to h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.move-to p {
+  margin: 0 0 0.25rem;
+}
+
+.move-to button {
+  min-height: 44px;
+  font: inherit;
+}
+
+.move-to .cancel {
+  margin-top: 0.5rem;
+}
+
+/* In a panel, the box that amends its Task stays under the thumb. */
+.panel .box {
+  position: sticky;
+  margin: 1rem -1rem 0;
 }

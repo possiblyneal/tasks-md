@@ -1,5 +1,5 @@
 // The one place a response becomes either what it carries or an Error saying
-// why it did not. `apps/todo/src/api/api.go` is the side that decides those
+// why it did not. `apps/tasks/src/api/api.go` is the side that decides those
 // words: a refusal's body is `{"error": "<the sentence the CLI would print>"}`,
 // so the sentence is thrown as it is rather than restated here.
 
@@ -14,6 +14,13 @@ export async function refused(response: Response): Promise<Error> {
       ? body.error
       : `the API answered ${response.status}`
   return new Error(sentence)
+}
+
+/** Reads one JSON body from `path`. */
+export async function get<T>(path: string): Promise<T> {
+  const response = await fetch(path)
+  if (!response.ok) throw await refused(response)
+  return (await response.json()) as T
 }
 
 /**

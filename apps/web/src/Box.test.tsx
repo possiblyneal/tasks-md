@@ -1,15 +1,21 @@
 // @vitest-environment jsdom
 
-// The box's one grammar: which route a dump goes out on. What the Broker read
-// is the same body either way, so the only thing that says a sentence typed
-// under a Task becomes a Subtask of it is the `parent` this was given -- and
-// getting that backwards writes a top-level Task nobody asked for.
+// The box hands a dump to the Broker and a question to it, and writes neither:
+// a dump comes back as a Draft for the form, which is the gate.
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, expect, test, vi } from 'vitest'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
+import { App } from './App'
 import { Box } from './Box'
-import { OFFERED_NOTHING, WIDE } from './state'
+import { WIDE } from './state'
+import { asked, BOARD } from './testing'
 import * as write from './write'
 
 afterEach(() => {
@@ -17,70 +23,187 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-/**
- * Renders the box it is given, hands it a dump, and submits the sheet that
- * comes back. Which box it is is spelled out at each call rather than switched
- * on here: the two are alternatives the type keeps apart, so there is no one
- * element that stands for both.
- */
-async function dumped(box: React.ReactElement) {
-  vi.spyOn(write, 'capture').mockResolvedValue({ title: 'Sand it down' })
-  const addTask = vi.spyOn(write, 'addTask').mockResolvedValue('t2')
-  const addSubtask = vi.spyOn(write, 'addSubtask').mockResolvedValue('t2')
-  render(box)
-  fireEvent.change(screen.getByRole('textbox'), {
-    target: { value: 'sand the shed down' },
-  })
-  fireEvent.click(screen.getByRole('button', { name: 'Add' }))
-  await vi.waitFor(() =>
-    expect(screen.getByLabelText('Title')).toHaveProperty(
-      'value',
-      'Sand it down',
-    ),
-  )
-  // The sheet's own Add is the one that submits it: the row that makes a List
-  // and the row that adds a field say Add too, and only one of the three is a
-  // submit.
-  const submit = screen
-    .getAllByRole('button', { name: 'Add' })
-    .find((one) => (one as HTMLButtonElement).type === 'submit')
-  if (!submit) throw new Error('the sheet has nothing to submit')
-  fireEvent.click(submit)
-  return { addTask, addSubtask }
+function say(words: string) {
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: words } })
 }
 
-test('a dump under a Task is submitted as a Subtask of it', async () => {
-  const { addTask, addSubtask } = await dumped(
-    <Box offered={OFFERED_NOTHING} parent="t1" />,
+test('a dump opens a Draft in the Repo the Broker guessed and writes nothing', async () => {
+  vi.spyOn(write, 'capture').mockResolvedValue({
+    repo: 'work',
+    title: 'Write the report',
+    priority: 'high',
+  })
+  const addTask = vi.spyOn(write, 'addTask')
+  const onDraft = vi.fn()
+  render(
+    <Box
+      repos={['house-move', 'work']}
+      narrowing={WIDE}
+      offline={false}
+      onDraft={onDraft}
+    />,
   )
+
+  say('the report, it is urgent')
+  fireEvent.click(screen.getByRole('button', { name: 'Read' }))
+
   await vi.waitFor(() =>
-    expect(addSubtask).toHaveBeenCalledWith(
-      't1',
-      expect.objectContaining({ title: 'Sand it down' }),
-    ),
+    expect(onDraft).toHaveBeenCalledWith({
+      ...write.blank('work'),
+      title: 'Write the report',
+      priority: 'high',
+    }),
   )
+  expect(write.capture).toHaveBeenCalledWith('the report, it is urgent')
   expect(addTask).not.toHaveBeenCalled()
 })
 
-test('a dump over the list is submitted as a top-level Task', async () => {
-  const { addTask, addSubtask } = await dumped(
-    <Box offered={OFFERED_NOTHING} narrowing={WIDE} />,
+test('a dump amending a Task carries it and opens it whole, what the Broker left out cleared', async () => {
+  vi.spyOn(write, 'capture').mockResolvedValue({
+    repo: 'house-move',
+    title: 'Wrap glassware',
+    why: 'the van comes friday',
+  })
+  const wrap = BOARD.repos[0]!.tasks[1]!
+  const onDraft = vi.fn()
+  render(
+    <Box
+      repos={['house-move']}
+      narrowing={WIDE}
+      offline={false}
+      amends={{ repo: 'house-move', task: wrap }}
+      onDraft={onDraft}
+    />,
   )
-  await vi.waitFor(() => expect(addTask).toHaveBeenCalled())
-  expect(addSubtask).not.toHaveBeenCalled()
+
+  // Amending is a dump alone: there is nothing to ask about one Task.
+  expect(screen.queryByRole('button', { name: /switch to/ })).toBeNull()
+  say('because the van comes friday')
+  fireEvent.click(screen.getByRole('button', { name: 'Read' }))
+
+  await vi.waitFor(() =>
+    expect(onDraft).toHaveBeenCalledWith({
+      ...write.draftOf('house-move', wrap),
+      title: 'Wrap glassware',
+      why: 'the van comes friday',
+      tags: [],
+      description: '',
+      deadline: '',
+    }),
+  )
+  expect(write.capture).toHaveBeenCalledWith('because the van comes friday', {
+    repo: 'house-move',
+    task: 'm3qc',
+  })
 })
 
-// A question is about a list, and a Task's own box has none: an Ask there
-// would narrow by nothing and answer about every open Task in the tracker.
-// What keeps the two apart is the type -- a box is given a Narrowing or a
-// parent and never both -- so this pins what that comes to on the screen.
-test('a Task of its own is not something the box asks about', () => {
-  render(<Box offered={OFFERED_NOTHING} parent="t1" />)
-  expect(screen.queryByRole('button', { name: 'Ask' })).toBeNull()
-  expect(screen.getByRole('button', { name: 'Add' })).toBeTruthy()
+test('a dump the Broker placed nowhere goes in the first Repo', async () => {
+  vi.spyOn(write, 'capture').mockResolvedValue({ repo: '', title: 'Hmm' })
+  const onDraft = vi.fn()
+  render(
+    <Box
+      repos={['house-move', 'work']}
+      narrowing={WIDE}
+      offline={false}
+      onDraft={onDraft}
+    />,
+  )
+
+  say('hmm')
+  fireEvent.click(screen.getByRole('button', { name: 'Read' }))
+
+  await vi.waitFor(() =>
+    expect(onDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ repo: 'house-move', title: 'Hmm' }),
+    ),
+  )
 })
 
-test("the list's box is the one with a question under the same thumb", () => {
-  render(<Box offered={OFFERED_NOTHING} narrowing={WIDE} />)
-  expect(screen.getByRole('button', { name: 'Ask' })).toBeTruthy()
+test('? asks about the Tasks in view and draws the answer above the field', async () => {
+  const narrowing = { ...WIDE, repo: 'work' }
+  vi.spyOn(write, 'ask').mockResolvedValue('Only the report is left.')
+  render(
+    <Box
+      repos={['work']}
+      narrowing={narrowing}
+      offline={false}
+      onDraft={() => {}}
+    />,
+  )
+
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Adding: switch to asking' }),
+  )
+  say('what is left?')
+  fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
+
+  expect(await screen.findByText('Only the report is left.')).toBeDefined()
+  expect(write.ask).toHaveBeenCalledWith('what is left?', narrowing)
+})
+
+test('offline, the box neither reads a dump nor asks', () => {
+  render(
+    <Box repos={['work']} narrowing={WIDE} offline={true} onDraft={() => {}} />,
+  )
+  say('anything')
+  for (const button of screen.getAllByRole('button')) {
+    expect(button).toHaveProperty('disabled', true)
+  }
+  expect(screen.getByRole('textbox')).toHaveProperty('disabled', true)
+})
+
+// On the board: the box opens the add form, and only the form's Add writes.
+describe('under the board', () => {
+  const writes = () =>
+    asked.filter(({ init }) => init?.method === 'POST').map(({ url }) => url)
+
+  beforeEach(() => {
+    asked.length = 0
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+      asked.push({ url, init })
+      const body =
+        url === '/api/capture'
+          ? { repo: 'house-move', title: 'Sand the shed' }
+          : url === '/api/tasks'
+            ? { id: 'n3w1' }
+            : BOARD
+      return Promise.resolve(new Response(JSON.stringify(body)))
+    })
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  const dump = async () => {
+    render(<App />)
+    fireEvent.change(await screen.findByLabelText('Say the Task'), {
+      target: { value: 'sand the shed' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Read' }))
+    return within(await screen.findByRole('dialog', { name: 'Add a Task' }))
+  }
+
+  test('a dump abandoned in the form writes nothing and keeps its words', async () => {
+    const form = await dump()
+    expect(form.getByLabelText('Title')).toHaveProperty(
+      'value',
+      'Sand the shed',
+    )
+    fireEvent.click(form.getByRole('button', { name: 'Cancel' }))
+
+    expect(writes()).toEqual(['/api/capture'])
+    expect(screen.getByLabelText('Say the Task')).toHaveProperty(
+      'value',
+      'sand the shed',
+    )
+  })
+
+  test("a dump's Task is written by the form's Add, and the box empties", async () => {
+    const form = await dump()
+    fireEvent.click(form.getByRole('button', { name: 'Add' }))
+
+    await vi.waitFor(() =>
+      expect(screen.getByLabelText('Say the Task')).toHaveProperty('value', ''),
+    )
+    expect(writes()).toEqual(['/api/capture', '/api/tasks'])
+  })
 })

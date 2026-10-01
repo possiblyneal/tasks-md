@@ -19,9 +19,19 @@ afterEach(() => {
 const TASK: Task = {
   id: 't1',
   title: 'Move house',
+  state: 'doing',
+  tags: [],
+  created: '2026-03-04',
+  attrs: [],
+  description: '',
+  line: 4,
   depth: 0,
-  createdAt: '2026-03-04T09:00:00Z',
-  marks: [],
+  parent: '',
+  parents: [],
+  leaf: true,
+  blocked: false,
+  rank: 0,
+  version: 'v0',
 }
 
 test('every attribute a proposal would write is drawn beside its tick', async () => {
@@ -38,7 +48,14 @@ test('every attribute a proposal would write is drawn beside its tick', async ()
       },
     ],
   })
-  render(<Breakdown task={TASK} onBack={() => {}} />)
+  render(
+    <Breakdown
+      repo="house-move"
+      task={TASK}
+      offline={false}
+      onBack={() => {}}
+    />,
+  )
 
   await screen.findByText('Book the van')
   expect(screen.getByText('The big one, not the transit.')).toBeDefined()
@@ -59,7 +76,14 @@ test('a level the store would refuse is drawn as the word the Broker used', asyn
     questions: [],
     proposals: [{ title: 'Book the van', priority: 'urgent' }],
   })
-  render(<Breakdown task={TASK} onBack={() => {}} />)
+  render(
+    <Breakdown
+      repo="house-move"
+      task={TASK}
+      offline={false}
+      onBack={() => {}}
+    />,
+  )
 
   await screen.findByText('Book the van')
   expect(screen.getByText('Priority urgent')).toBeDefined()
@@ -74,31 +98,103 @@ test('the line of single words is not drawn when there are none', async () => {
     questions: [],
     proposals: [{ title: 'Book the van' }],
   })
-  const drawn = render(<Breakdown task={TASK} onBack={() => {}} />)
+  const drawn = render(
+    <Breakdown
+      repo="house-move"
+      task={TASK}
+      offline={false}
+      onBack={() => {}}
+    />,
+  )
 
   await screen.findByText('Book the van')
   expect(drawn.container.querySelector('.facts')).toBeNull()
 })
 
-// The gate is that the write carries nothing the tick did not show. The type
-// says so on this side and `write.AsProposed` says so on the other, but the
-// thing in between is this screen handing the proposal to `addSubtask`
-// untouched, and that is what would quietly stop being true.
-test('approving writes the proposal and nothing added to it', async () => {
+// The gate is that the write carries nothing the tick did not show, and that
+// every ticked proposal goes in one write under the version the breakdown
+// opened on, so a refusal leaves nothing half written.
+test('approving writes the ticked proposals as one write and nothing added to them', async () => {
   vi.spyOn(write, 'breakdown').mockResolvedValue({
     questions: [],
-    proposals: [{ title: 'Book the van', estimate: '30m' }],
+    proposals: [
+      { title: 'Book the van', estimate: 'small' },
+      { title: 'Pack the books' },
+      { title: 'Cancel the milk' },
+    ],
   })
-  const wrote = vi.spyOn(write, 'addSubtask').mockResolvedValue('t2')
-  render(<Breakdown task={TASK} onBack={() => {}} />)
+  const wrote = vi.spyOn(write, 'addSubtasks').mockResolvedValue(['t2', 't3'])
+  const onBack = vi.fn()
+  render(
+    <Breakdown repo="house-move" task={TASK} offline={false} onBack={onBack} />,
+  )
+
+  fireEvent.click(await screen.findByLabelText('Pack the books'))
+  fireEvent.click(screen.getByRole('button', { name: 'Add 2' }))
+
+  await vi.waitFor(() => expect(onBack).toHaveBeenCalled())
+  expect(wrote).toHaveBeenCalledTimes(1)
+  expect(wrote).toHaveBeenCalledWith('house-move', 't1', 'v0', [
+    { title: 'Book the van', estimate: 'small' },
+    { title: 'Cancel the milk' },
+  ])
+})
+
+test('offline, nothing is approved', async () => {
+  vi.spyOn(write, 'breakdown').mockResolvedValue({
+    questions: [],
+    proposals: [{ title: 'Book the van' }],
+  })
+  render(
+    <Breakdown
+      repo="house-move"
+      task={TASK}
+      offline={true}
+      onBack={() => {}}
+    />,
+  )
 
   await screen.findByText('Book the van')
-  fireEvent.click(screen.getByRole('button', { name: 'Add 1' }))
+  expect(screen.getByRole('button', { name: 'Add 1' })).toHaveProperty(
+    'disabled',
+    true,
+  )
+})
 
-  await vi.waitFor(() => expect(wrote).toHaveBeenCalledTimes(1))
-  expect(wrote.mock.calls[0]?.[0]).toBe('t1')
-  expect(wrote.mock.calls[0]?.[1]).toEqual({
-    title: 'Book the van',
-    estimate: '30m',
+// A turn the Broker never answered loses nothing: the questions stay with what
+// was typed into them, and asking again sends each answer once.
+test('a failed turn keeps the questions and the replies to retry', async () => {
+  const turn = vi
+    .spyOn(write, 'breakdown')
+    .mockResolvedValueOnce({ questions: ['Which van?'], proposals: [] })
+    .mockRejectedValueOnce(new Error('the broker timed out'))
+    .mockResolvedValueOnce({
+      questions: [],
+      proposals: [{ title: 'Book the big van' }],
+    })
+  render(
+    <Breakdown
+      repo="house-move"
+      task={TASK}
+      offline={false}
+      onBack={() => {}}
+    />,
+  )
+
+  fireEvent.change(await screen.findByLabelText('Which van?'), {
+    target: { value: 'The big one' },
   })
+  fireEvent.click(screen.getByRole('button', { name: 'Answer' }))
+
+  await screen.findByText('the broker timed out')
+  expect(screen.getByLabelText('Which van?')).toHaveProperty(
+    'value',
+    'The big one',
+  )
+
+  fireEvent.click(screen.getByRole('button', { name: 'Answer' }))
+  await screen.findByText('Book the big van')
+  expect(turn).toHaveBeenLastCalledWith('house-move', 't1', [
+    { question: 'Which van?', answer: 'The big one' },
+  ])
 })

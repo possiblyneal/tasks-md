@@ -1,294 +1,432 @@
-import { useEffect, useState } from 'react'
+import { type DragEvent, useRef, useState } from 'react'
 
-import { Activity } from './Activity'
-import { Box } from './Box'
 import { sentence } from './api'
-import { Collections } from './Collections'
-import { Detail } from './Detail'
-import { Narrow, Search } from './Narrow'
-import { Row } from './Row'
+import { Box } from './Box'
+import { Breakdown } from './Breakdown'
+import { Due } from './Due'
+import { useHold } from './hold'
+import { Metrics } from './Metrics'
+import { MoveTo } from './MoveTo'
+import { Narrow } from './Narrow'
+import { Panel } from './Panel'
+import { Sheet } from './Sheet'
+import { usePoll } from './poll'
 import {
-  fetchState,
-  type Narrowing,
-  OFFERED_NOTHING,
+  named,
   queryString,
+  type Repo,
   type State,
+  STATES,
+  type Task,
   WIDE,
 } from './state'
+import {
+  addTask,
+  blank,
+  deleteTask,
+  type Draft,
+  draftOf,
+  editTask,
+  moveTask,
+} from './write'
 
-// The store's write-ahead log is what says a write happened, so this polls it
-// once a second over HTTP, and the ETag is what keeps that to a 304 while
-// nothing writes.
-const POLL_MS = 1000
+/** The Task a panel is open on. An id is unique only within its Repo. */
+type Opened = { id: string; repo: string }
 
 /**
- * Which screen is open. There is no router: the client is a handful of screens
- * and a box, and a screen is what is on the phone rather than an
- * address, so a dependency for it would be a decision and not a convenience.
+ * What the form is open on: a new Task, or one being edited, with its id, its
+ * tree's version and the Task itself as they were read when the form opened.
+ * An edit sends what differs from the Task read, which is not the draft when a
+ * dump amended it.
  */
-type Screen =
-  | { name: 'list' }
-  | { name: 'task'; id: string }
-  | { name: 'agents' }
-  | { name: 'collections' }
+type Form = { draft: Draft } & (
+  { id: string; version: string; was: Draft } | { id?: never; dumped?: boolean }
+)
 
+/**
+ * The board: six State lanes over every Repo, a card per leaf Task. It draws
+ * what the read returned and works nothing out for itself: a Task's State,
+ * whether it is Blocked, its parents' titles and its order all arrive with it.
+ *
+ * Two reads are polled. The wide one draws the chips and the panel, which
+ * need every Repo, Tag and parent whatever the lanes are narrowed to; the
+ * narrowed one draws the lanes, and is not made while nothing is narrowed.
+ *
+ * A move is a card dragged to another lane at a desk, or held on a phone and
+ * sent through Move to. Add opens the form on a new Task, and a panel's Edit
+ * opens it on that Task. The next poll draws what any write did.
+ *
+ * The box under the board opens the same form on what the Broker read out of
+ * a dump, and the box in a panel opens it on that Task as a dump amended it.
+ * A panel's Break down opens the breakdown in its place. None of them writes
+ * before somebody submits.
+ */
 export function App() {
-  const [state, setState] = useState<State | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [etag, setEtag] = useState<string | null>(null)
-  const [screen, setScreen] = useState<Screen>({ name: 'list' })
-  // The list opens on the everyday view, the same one `todo list` prints with
-  // no flags. It is held here rather than in the controls because the poll and
-  // the question both ask under it.
-  const [narrowing, setNarrowing] = useState<Narrowing>(WIDE)
-  // The narrowing the Tasks on the screen were read under, which is not the
-  // one the controls show for the round trip after a control is touched. The
-  // list is left standing meanwhile rather than blanked, so the sentence under
-  // an empty one has to name the narrowing that emptied it and not the one
-  // being asked for.
-  const [drawn, setDrawn] = useState<Narrowing>(WIDE)
+  const [narrowing, setNarrowing] = useState(WIDE)
+  const [opened, setOpened] = useState<Opened | null>(linked)
+  const [refusal, setRefusal] = useState<string | null>(null)
+  const [moving, setMoving] = useState<Placed | null>(null)
+  const [form, setForm] = useState<Form | null>(null)
+  const [breaking, setBreaking] = useState(false)
+  // Bumped once a dump's Task is added, which empties the box. A dump
+  // abandoned in the form keeps its words there to be read again.
+  const [said, setSaid] = useState(0)
+  // The card a drag picked up. It is kept here rather than in the drag's own
+  // data, which a browser hands back only on the drop.
+  const dragged = useRef<Placed | null>(null)
+  const wide = usePoll(WIDE)
+  const narrowed = usePoll(queryString(narrowing) ? narrowing : null)
+  const board = queryString(narrowing) ? narrowed.board : wide.board
+  const error = wide.error ?? narrowed.error
+  // Away from home the board is the last one read, and nothing on it writes.
+  const offline = wide.offline || narrowed.offline
 
-  // The query is what the effect depends on rather than the object holding it:
-  // a Narrowing is a new object on every render and depending on one would
-  // restart the poll forever.
-  const query = queryString(narrowing)
-
-  useEffect(() => {
-    const controller = new AbortController()
-    let etag: string | null = null
-
-    const poll = async () => {
-      try {
-        const snapshot = await fetchState(narrowing, etag, controller.signal)
-        // Aborting does not reject a response that already arrived, so a poll
-        // torn down between the response and its body draws the narrowing it
-        // asked under over the one that replaced it. The catch guards for the
-        // same reason; this is the other half of it.
-        if (controller.signal.aborted) return
-        // A null snapshot is 304: nothing changed, so nothing is redrawn.
-        if (snapshot) {
-          etag = snapshot.etag
-          setState(snapshot.state)
-          setDrawn(narrowing)
-          // The tag is the revision the other screens fetch their own reads
-          // again on. It changes when something was written and also when the
-          // narrowing did, since the API hashes the query into it; a narrowing
-          // cannot change while those screens are mounted, so what they see is
-          // the first of the two.
-          setEtag(snapshot.etag)
-        }
-        setError(null)
-      } catch (caught) {
-        if (controller.signal.aborted) return
-        // The tag described a response this client may no longer hold, so the
-        // next poll asks for the whole thing rather than risking a 304 against
-        // a screen that failed to draw.
-        etag = null
-        setError(sentence(caught))
-      }
-    }
-
-    // Each poll is scheduled once the one before it has settled rather than
-    // on a fixed interval, so two can never be in flight together. Overlapping
-    // reads come back in whatever order they come back in, and the slower one
-    // would draw its older list over the newer one and leave a stale ETag
-    // behind to be answered 304 against.
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const tick = async () => {
-      await poll()
-      if (!controller.signal.aborted) {
-        timer = setTimeout(() => void tick(), POLL_MS)
-      }
-    }
-
-    void tick()
-    return () => {
-      controller.abort()
-      clearTimeout(timer)
-    }
-    // A changed narrowing starts the poll again from no ETag, which is what
-    // keeps the tag and the list it describes the same age. The API hashes the
-    // query into the tag as well, so an old one cannot be answered 304 against
-    // a different view even if one were handed back.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query])
-
-  // Selected and open are one state, not two: a tap selects a Task, and which
-  // of the two ways that is drawn is the layout's. `selected` is what somebody
-  // tapped and `open` is the Task the last read still describes; they differ
-  // only while a Task is going away under the selection.
-  const selected = screen.name === 'task'
-  const open = selected ? find(state, screen.id) : undefined
-
-  if (screen.name === 'collections') {
-    return (
-      <Collections
-        offered={state ?? OFFERED_NOTHING}
-        // Whether a read has landed, which is not the same as having no Lists:
-        // this screen is reachable inside the first second and a poll that has
-        // been failing since load would otherwise tell somebody their Lists are
-        // gone. The error is drawn over what is there for the reason the list
-        // draws it that way.
-        read={state !== null}
-        error={error}
-        onBack={() => setScreen({ name: 'list' })}
-      />
-    )
+  // The address names the open panel, so a panel can be linked to and a
+  // reload comes back to it.
+  const open = (next: Opened | null) => {
+    setOpened(next)
+    setBreaking(false)
+    const query = next
+      ? `?${new URLSearchParams({ task: next.id, repo: next.repo })}`
+      : ''
+    window.history.replaceState(null, '', `${window.location.pathname}${query}`)
   }
 
-  if (screen.name === 'agents') {
-    return (
-      <Activity
-        tasks={state?.tasks ?? []}
-        offered={state ?? OFFERED_NOTHING}
-        revision={etag}
-        onBack={() => setScreen({ name: 'list' })}
-      />
-    )
+  const found = opened && wide.board && find(wide.board.repos, opened)
+
+  const move = async ({ repo, task }: Placed, to: State) => {
+    setMoving(null)
+    if (task.state === to) return
+    try {
+      await moveTask(repo.name, task.id, to)
+      setRefusal(null)
+    } catch (caught) {
+      setRefusal(sentence(caught))
+    }
   }
+
+  const save = async (after: Draft) => {
+    if (!form) return
+    if (form.id !== undefined) {
+      await editTask(form.id, form.version, form.was, after)
+    } else {
+      await addTask(after)
+      if (form.dumped) setSaid((n) => n + 1)
+    }
+    setForm(null)
+  }
+
+  const drop = (to: State) => (event: DragEvent) => {
+    event.preventDefault()
+    const card = dragged.current
+    dragged.current = null
+    if (card) void move(card, to)
+  }
+
+  const flagged =
+    wide.board?.repos.filter((repo) => repo.problems.length > 0) ?? []
+  const marked = wide.board?.repos.filter((repo) => repo.flags.length > 0) ?? []
 
   return (
-    <div className={selected ? 'panes showing' : 'panes'}>
-      <div className="pane filters">
-        {/*
-          The controls are drawn before the first read lands, with nothing in
-          the pickers but the everyday view. They are what asks for a list, so a
-          screen that waited for a list before offering them would be waiting on
-          itself.
-        */}
+    <main className="board">
+      {/* A failed poll takes nothing off the board: the sentence goes over
+          the cards it interrupted. */}
+      {error && <p className="message">{error}</p>}
+      {offline && (
+        <p className="message" role="status">
+          Offline: this is the last board read, and nothing can be changed until
+          tasks.lan answers again.
+        </p>
+      )}
+      {refusal && <p className="message">{refusal}</p>}
+      {board?.errors.map((said) => (
+        <p className="message" key={said}>
+          {said}
+        </p>
+      ))}
+      {wide.board && (
+        <button
+          type="button"
+          className="control"
+          disabled={offline || wide.board.repos.length === 0}
+          onClick={() =>
+            setForm({ draft: blank(wide.board?.repos[0]?.name ?? '') })
+          }
+        >
+          Add
+        </button>
+      )}
+      {wide.board && (
         <Narrow
           narrowing={narrowing}
-          offered={state ?? OFFERED_NOTHING}
+          wide={wide.board}
           onChange={setNarrowing}
         />
-      </div>
-
-      <div className="pane middle">
-        {/*
-          The box is above the list rather than behind a tap, because a dump is
-          the most frequent thing anybody does here and nothing should be
-          stacked in front of it. On a phone that is `index.css` ordering this
-          pane's children into the one column ahead of the filtering, since the
-          panes as written would put the filtering first. The Lists and Tags it
-          offers on the add sheet are the ones the last read named; before the
-          first one there are none to offer and the sheet shows none.
-        */}
-        <Box
-          offered={state ?? OFFERED_NOTHING}
-          // A question is asked about the Tasks on the screen, which is the
-          // narrowing they were read under and not the one the controls are
-          // showing: a question asked between a control moving and its list
-          // arriving would be answered about a list nobody is looking at yet.
-          narrowing={drawn}
-        />
-        {/*
-          The box the list is searched in sits over the Tasks and not among the
-          filtering: it is about what is under it, which is the same thing on a
-          phone and in the middle pane at a desk.
-        */}
-        <Search
-          value={narrowing.search}
-          onChange={(search) => setNarrowing({ ...narrowing, search })}
-        />
-        {/*
-          An error sits over the list rather than replacing it. A poll that
-          failed says nothing about the Tasks already on the screen, and a
-          phone that walked out of range should not have its list taken away
-          while it walks back.
-        */}
-        {error && <p className="message">{error}</p>}
-        {!state && !error && <p className="message">Reading the list…</p>}
-        {state && state.tasks.length === 0 && (
-          <p className="message">
-            {/*
-            The List, the Tag and the search are what take Tasks out of a read
-            this client asks for, so one of them set is a list narrowed to
-            nothing. A sort reorders what came back and cannot empty it, and
-            `all` widens rather than narrows, so neither is asked about here: a
-            store with nothing in it says so under every sort and under the
-            toggle both ways.
-
-            That leaves the everyday view over a store holding only ended Tasks
-            saying nothing is here yet. Telling that from an empty store would
-            take a second read, and for a fresh store this is the right
-            sentence.
-          */}
-            {!drawn.list && drawn.tags.length === 0 && !drawn.search
-              ? 'Nothing here yet.'
-              : 'Nothing matches what the list is narrowed to.'}
-          </p>
-        )}
-        {state && state.tasks.length > 0 && (
-          <ul className="list">
-            {state.tasks.map((task) => (
-              <Row
-                key={task.id}
-                task={task}
-                lists={state.lists}
-                onOpen={(id) => setScreen({ name: 'task', id })}
-              />
-            ))}
-          </ul>
-        )}
-        <div className="buttons">
-          <button type="button" onClick={() => setScreen({ name: 'agents' })}>
-            Activity
-          </button>
-          <button
-            type="button"
-            onClick={() => setScreen({ name: 'collections' })}
-          >
-            Lists and Tags
-          </button>
-        </div>
-      </div>
-
-      {/*
-        The Task that is selected, which is the same selection whichever width
-        this is drawn at: beside the list at a desk and instead of it on a
-        phone, decided in `index.css` rather than by anything measured here.
-
-        A Task the read no longer names is a Task that went out of the list
-        while it was selected: deleted from another surface, or narrowed out
-        by a filter changed on this one. The pane says so rather than
-        disappearing, because the tap that selected it was somebody's, and the
-        sentence says the list rather than the tracker because which of the two
-        it was is not something this surface knows.
-      */}
-      {selected && state && (
-        <div className="pane opened">
-          {open ? (
-            <Detail
-              // Keyed on the Task, so opening a Subtask from here starts a
-              // screen of its own rather than reusing this one: the history,
-              // the error and the open sheet all belong to the Task they were
-              // about.
-              key={open.id}
-              task={open}
-              subtasks={state.tasks.filter((task) => task.parent === open.id)}
-              // A State is an Offered with the Tasks on it, and the guard on
-              // the pane has already said there is one, so this site does not
-              // need the empty stand-in the three above do.
-              offered={state}
-              revision={etag}
-              onOpen={(id) => setScreen({ name: 'task', id })}
-              onBack={() => setScreen({ name: 'list' })}
-            />
-          ) : (
-            <>
-              <p className="message">That task is not in the list any more.</p>
-              <button type="button" onClick={() => setScreen({ name: 'list' })}>
-                Back
-              </button>
-            </>
-          )}
-        </div>
       )}
-    </div>
+      {board && <Metrics weeks={board.metrics} />}
+      {flagged.length > 0 && (
+        <aside className="problems" aria-label="Problems">
+          <h2>Problems</h2>
+          <ul>
+            {flagged.flatMap((repo) =>
+              repo.problems.map((p) => (
+                <li key={`${repo.name}:${p.line}:${p.message}`}>
+                  {`${repo.name} line ${p.line}: ${p.message}`}
+                </li>
+              )),
+            )}
+          </ul>
+        </aside>
+      )}
+      {marked.length > 0 && (
+        <aside className="problems" aria-label="Flags">
+          <h2>Flags</h2>
+          <ul>
+            {marked.flatMap((repo) =>
+              repo.flags.map((flag) => (
+                <li key={`${repo.name}:${flag}`}>{`${repo.name}: ${flag}`}</li>
+              )),
+            )}
+          </ul>
+        </aside>
+      )}
+      <div className="lanes">
+        {STATES.map((state) => {
+          const cards = (board?.repos ?? [])
+            .flatMap((repo) =>
+              repo.tasks
+                .filter((task) => task.leaf && task.state === state)
+                .map((task) => ({ repo, task })),
+            )
+            .sort((a, b) => a.task.rank - b.task.rank)
+          const name = named(state)
+          return (
+            <section
+              className="lane"
+              aria-label={name}
+              key={state}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={drop(state)}
+            >
+              <h2>
+                {name} <small>{cards.length}</small>
+              </h2>
+              {cards.map(({ repo, task }) => (
+                <Card
+                  key={`${repo.name}:${task.line}`}
+                  repo={repo}
+                  task={task}
+                  today={board?.today ?? ''}
+                  movable={!offline}
+                  onOpen={() => open({ id: task.id, repo: repo.name })}
+                  onHold={() => setMoving({ repo, task })}
+                  onDragStart={(event) => {
+                    dragged.current = { repo, task }
+                    event.dataTransfer.effectAllowed = 'move'
+                    event.dataTransfer.setData('text/plain', task.id)
+                  }}
+                  // A card let go anywhere but a lane is no longer being
+                  // dragged, so a later drop of text or a file moves nothing.
+                  onDragEnd={() => {
+                    dragged.current = null
+                  }}
+                />
+              ))}
+            </section>
+          )
+        })}
+      </div>
+      {/* Before every sheet and dialog, which are drawn over it. */}
+      {wide.board && (
+        <Box
+          key={said}
+          repos={wide.board.repos.map((repo) => repo.name)}
+          narrowing={narrowing}
+          offline={offline}
+          onDraft={(draft) => setForm({ draft, dumped: true })}
+        />
+      )}
+      {moving && !offline && (
+        <MoveTo
+          title={moving.task.title}
+          from={moving.task.state}
+          onMove={(to) => void move(moving, to)}
+          onCancel={() => setMoving(null)}
+        />
+      )}
+      {opened && wide.board && !found && (
+        <p className="message">
+          {opened.repo
+            ? `No Task ${opened.id} is in ${opened.repo} on the board.`
+            : `No Task ${opened.id} is on the board.`}
+        </p>
+      )}
+      {found && wide.board && !form && breaking && (
+        <>
+          <div className="scrim" aria-hidden="true" />
+          <div
+            className="panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Break down the Task"
+          >
+            <Breakdown
+              repo={found.repo.name}
+              task={found.task}
+              offline={offline}
+              onBack={() => setBreaking(false)}
+            />
+          </div>
+        </>
+      )}
+      {found && wide.board && !form && !breaking && (
+        <Panel
+          // Each Task opens on a fresh panel, so an armed Delete, a refusal or
+          // another Task's history is never carried over to it.
+          key={`${found.repo.name}/${found.task.id}`}
+          repo={found.repo}
+          task={found.task}
+          today={wide.board.today}
+          onOpen={(id) => open({ id, repo: found.repo.name })}
+          onEdit={() =>
+            setForm({
+              draft: draftOf(found.repo.name, found.task),
+              id: found.task.id,
+              version: found.task.version,
+              was: draftOf(found.repo.name, found.task),
+            })
+          }
+          onAmend={(draft) =>
+            setForm({
+              draft,
+              id: found.task.id,
+              version: found.task.version,
+              was: draftOf(found.repo.name, found.task),
+            })
+          }
+          onDelete={async () => {
+            await deleteTask(found.repo.name, found.task.id, found.task.version)
+            open(null)
+          }}
+          onBreakdown={() => setBreaking(true)}
+          onClose={() => open(null)}
+          offline={offline}
+        />
+      )}
+      {form && wide.board && (
+        <>
+          <div className="scrim" aria-hidden="true" />
+          <div
+            className="panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label={form.id ? 'Edit the Task' : 'Add a Task'}
+          >
+            <Sheet
+              draft={form.draft}
+              repos={wide.board.repos.map((repo) => repo.name)}
+              existing={form.id !== undefined}
+              offline={offline}
+              action={form.id ? 'Save' : 'Add'}
+              onSubmit={save}
+              onCancel={() => setForm(null)}
+            />
+          </div>
+        </>
+      )}
+    </main>
   )
 }
 
-/** The Task a screen is open on, where the last read still names it. */
-function find(state: State | null, id: string) {
-  return state?.tasks.find((task) => task.id === id)
+/** A card as the board placed it: the Task, and the Repo it is in. */
+type Placed = { repo: Repo; task: Task }
+
+// A drag between lanes is for a mouse or a pen. On a phone a press on a card is
+// a scroll or a hold, never a drag.
+const DESK = window.matchMedia?.('(pointer: fine)').matches ?? true
+
+/** The Task a link names: `?task=<id>&repo=<name>`, the Repo optional. */
+function linked(): Opened | null {
+  const query = new URLSearchParams(window.location.search)
+  const id = query.get('task')
+  return id ? { id, repo: query.get('repo') ?? '' } : null
+}
+
+/** The Task opened, in the named Repo, or the first Repo holding the id. */
+function find(
+  repos: Repo[],
+  { id, repo: name }: Opened,
+): { repo: Repo; task: Task } | null {
+  for (const repo of repos) {
+    if (name && repo.name !== name) continue
+    const task = repo.tasks.find((t) => t.id === id)
+    if (task) return { repo, task }
+  }
+  return null
+}
+
+/**
+ * One leaf Task. A parent is not a card of its own: its title is drawn above
+ * each leaf under it, which is how a nested Task is placed on a flat lane.
+ */
+function Card({
+  repo,
+  task,
+  today,
+  movable,
+  onOpen,
+  onHold,
+  onDragStart,
+  onDragEnd,
+}: {
+  repo: Repo
+  task: Task
+  today: string
+  movable: boolean
+  onOpen: () => void
+  onHold: () => void
+  onDragStart: (event: DragEvent) => void
+  onDragEnd: () => void
+}) {
+  const deadline = attr(task, 'deadline')
+  const estimate = attr(task, 'estimate')
+  const hold = useHold(onHold)
+  return (
+    <article
+      className="card"
+      draggable={DESK && movable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      {...(movable ? hold : {})}
+      // The Repo's own color, as its preamble names it. A word CSS cannot read
+      // draws no edge rather than a wrong one.
+      style={repo.color ? { borderInlineStartColor: repo.color } : undefined}
+    >
+      {task.parents.length > 0 && (
+        <small className="parents">{`${task.parents.join(' › ')} ›`}</small>
+      )}
+      {/* Opened by its id, so a hand-typed Task without one, which lint
+          already flags, is not a link. */}
+      {task.id ? (
+        <button type="button" className="card-title" onClick={onOpen}>
+          {task.title}
+        </button>
+      ) : (
+        <span className="card-title">{task.title}</span>
+      )}
+      <span className="facts">
+        <b className="repo">{repo.name}</b>
+        {task.tags.map((tag) => (
+          <span key={tag}>#{tag}</span>
+        ))}
+        {deadline && <Due on={deadline} today={today} />}
+        {estimate && <span>{estimate}</span>}
+        {task.blocked && <span className="blocked">blocked</span>}
+      </span>
+    </article>
+  )
+}
+
+function attr(task: Task, label: string): string | undefined {
+  return task.attrs.find((a) => a.label === label)?.value
 }

@@ -2,4 +2,4 @@ go 1.26.0
 
 toolchain go1.26.8
 
-use ./apps/todo
+use ./apps/tasks

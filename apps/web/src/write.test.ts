@@ -1,23 +1,18 @@
 import { afterEach, expect, test, vi } from 'vitest'
 
 import {
-  addSubtask,
+  addSubtasks,
   addTask,
   ask,
-  attach,
+  blank,
   breakdown,
   capture,
-  detach,
-  detachEdited,
+  deleteTask,
   draftOf,
   editTask,
-  lifecycle,
-  mark,
-  memberships,
-  repeat,
-  unrepeat,
 } from './write'
 import { queryString, WIDE } from './state'
+import { task } from './testing'
 
 // What the last call sent, which is how the body is checked: the routes take
 // JSON and a client that posted something else would still get a Response.
@@ -49,8 +44,8 @@ test('a dump goes to the broker and comes back as the body the sheet submits', a
     'fetch',
     answering(200, {
       title: 'Paint the fence',
-      estimate: '90m',
-      intoLists: ['list_house'],
+      estimate: 'medium',
+      tags: ['house'],
     }),
   )
 
@@ -60,7 +55,7 @@ test('a dump goes to the broker and comes back as the body the sheet submits', a
   expect(sent?.init?.method).toBe('POST')
   expect(body()).toEqual({ text: 'paint the fence before march' })
   expect(draft.title).toBe('Paint the fence')
-  expect(draft.intoLists).toEqual(['list_house'])
+  expect(draft.tags).toEqual(['house'])
 })
 
 test('a question comes back as prose', async () => {
@@ -76,11 +71,11 @@ test('a question comes back as prose', async () => {
 // question or the Broker answers about a list nobody is looking at.
 test('a question is asked about the list as it is narrowed', async () => {
   vi.stubGlobal('fetch', answering(200, { answer: 'Two of them are overdue.' }))
-  const narrowing = { ...WIDE, all: true, list: 'l1', sort: 'deadline' }
+  const narrowing = { ...WIDE, repo: 'work', states: ['doing' as const] }
 
   await ask('how many?', narrowing)
 
-  expect(sent?.url).toBe('/api/ask?all=true&list=l1&sort=deadline')
+  expect(sent?.url).toBe('/api/ask?repo=work&state=doing')
   // The same string the poll carries, built by the same function: the two
   // agreeing is the point, and a second spelling is how they stop agreeing.
   expect(sent?.url).toBe(`/api/ask${queryString(narrowing)}`)
@@ -89,10 +84,12 @@ test('a question is asked about the list as it is narrowed', async () => {
 test('a written task is named by the id the api answers with', async () => {
   vi.stubGlobal('fetch', answering(201, { id: 'task_abc' }))
 
-  const id = await addTask({ title: 'Paint the fence', intoLists: ['list_a'] })
+  const draft = { ...blank('house-move'), title: 'Paint the fence' }
+  const id = await addTask(draft)
 
   expect(id).toBe('task_abc')
-  expect(body()).toEqual({ title: 'Paint the fence', intoLists: ['list_a'] })
+  expect(sent?.url).toBe('/api/tasks')
+  expect(body()).toEqual(draft)
 })
 
 test('a refusal surfaces the sentence the CLI would have printed', async () => {
@@ -100,7 +97,9 @@ test('a refusal surfaces the sentence the CLI would have printed', async () => {
     'cannot read "next tuesday" as a date: want 2006-01-02, 2006-01-02 15:04, or RFC 3339'
   vi.stubGlobal('fetch', answering(400, { error: sentence }))
 
-  await expect(addTask({ deadline: 'next tuesday' })).rejects.toThrow(sentence)
+  await expect(
+    addTask({ ...blank('work'), deadline: 'next tuesday' }),
+  ).rejects.toThrow(sentence)
 })
 
 test('an error with no sentence in it still says what happened', async () => {
@@ -113,143 +112,24 @@ test('an error with no sentence in it still says what happened', async () => {
   )
 })
 
-test('the sheet submits the memberships that changed, both ways', () => {
-  const before = { intoLists: ['house'], addTags: ['outdoors'] }
-  const after = { intoLists: ['garage'], addTags: ['outdoors', 'spring'] }
+test('approved Subtasks are one write under the Task in the path', async () => {
+  vi.stubGlobal('fetch', answering(201, { ids: ['c1', 'c2'] }))
 
-  expect(memberships(before, after)).toEqual({
-    intoLists: ['garage'],
-    outOfLists: ['house'],
-    addTags: ['spring'],
-    dropTags: [],
+  const ids = await addSubtasks('house-move', 'm3qa', 'v0', [
+    { title: 'Buy the paint' },
+    { title: 'Sand it', estimate: 'small' },
+  ])
+
+  expect(ids).toEqual(['c1', 'c2'])
+  expect(sent?.url).toBe('/api/tasks/m3qa/subtasks')
+  expect(body()).toEqual({
+    repo: 'house-move',
+    version: 'v0',
+    subtasks: [
+      { title: 'Buy the paint' },
+      { title: 'Sand it', estimate: 'small' },
+    ],
   })
-})
-
-// A sheet opened on a draft carries nothing to leave, so every tick is a join.
-test('a draft with no memberships joins whatever is ticked', () => {
-  expect(memberships({}, { intoLists: ['house'] })).toEqual({
-    intoLists: ['house'],
-    outOfLists: [],
-    addTags: [],
-    dropTags: [],
-  })
-})
-
-// The edit sheet opens on the Task as it is, and what it shows has to go back
-// as something the API reads: a deadline the way it came, a duration as one.
-test('a task reads back as the body that edits it', () => {
-  const draft = draftOf({
-    id: 'task_a',
-    depth: 1,
-    title: 'Paint the fence',
-    createdAt: '2026-09-16T10:00:00Z',
-    deadline: '2026-03-04T00:00:00Z',
-    estimateSeconds: 5400,
-    lists: ['house'],
-    tags: ['outdoors'],
-    marks: [],
-  })
-
-  expect(draft.title).toBe('Paint the fence')
-  expect(draft.deadline).toBe('2026-03-04T00:00:00Z')
-  expect(draft.estimate).toBe('90m')
-  expect(draft.intoLists).toEqual(['house'])
-  expect(draft.addTags).toEqual(['outdoors'])
-})
-
-test('a task with nothing to estimate has no estimate to send', () => {
-  const draft = draftOf({
-    id: 'task_a',
-    depth: 1,
-    title: 'Paint the fence',
-    createdAt: '2026-09-16T10:00:00Z',
-    marks: [],
-  })
-
-  expect(draft.estimate).toBeUndefined()
-  expect(draft.deadline).toBeUndefined()
-})
-
-// The four are the API's list, so this sends the verb and reads the sentence
-// back rather than keeping a second copy of which four there are.
-test('a lifecycle verb is one post to the task', async () => {
-  vi.stubGlobal('fetch', answering(200, { id: 'task_abc' }))
-
-  await lifecycle('task_abc', 'complete')
-
-  expect(sent?.url).toBe('/api/tasks/task_abc/complete')
-  expect(sent?.init?.method).toBe('POST')
-})
-
-test('a subtask is written under the task in the path', async () => {
-  vi.stubGlobal('fetch', answering(201, { id: 'task_child' }))
-
-  const id = await addSubtask('task_parent', { title: 'Buy the paint' })
-
-  expect(id).toBe('task_child')
-  expect(sent?.url).toBe('/api/tasks/task_parent/subtasks')
-  expect(body()).toEqual({ title: 'Buy the paint' })
-})
-
-// The target rides in the body and not the path, because a pointer carries its
-// own slashes. Both sides have to agree on the field name for that to work, and
-// `decode` refuses a field it does not know, so a rename on either side is a
-// 400 nothing else would catch.
-test('a pointer is added in the body under the task in the path', async () => {
-  vi.stubGlobal('fetch', answering(200, { id: 'task_abc' }))
-
-  await attach('task_abc', '/home/neal/plans/shed.pdf')
-
-  expect(sent?.url).toBe('/api/tasks/task_abc/attachments')
-  expect(sent?.init?.method).toBe('POST')
-  expect(body()).toEqual({ target: '/home/neal/plans/shed.pdf' })
-})
-
-test('taking a pointer off names it in the body too', async () => {
-  vi.stubGlobal('fetch', answering(200, { id: 'task_abc' }))
-
-  await detach('task_abc', 'https://example.com/a?b=c#d')
-
-  expect(sent?.url).toBe('/api/tasks/task_abc/attachments')
-  expect(sent?.init?.method).toBe('DELETE')
-  // Slashes, a query and a fragment all survive, which is the whole reason the
-  // target is not a path segment.
-  expect(body()).toEqual({ target: 'https://example.com/a?b=c#d' })
-})
-
-test('an edit patches the task it is about', async () => {
-  vi.stubGlobal('fetch', answering(200, { id: 'task_abc' }))
-
-  await editTask('task_abc', { title: 'Paint the shed' })
-
-  expect(sent?.url).toBe('/api/tasks/task_abc')
-  expect(sent?.init?.method).toBe('PATCH')
-})
-
-test('a rule is set as one value and stopping is its own call', async () => {
-  vi.stubGlobal('fetch', answering(200, { id: 'task_abc' }))
-
-  await repeat('task_abc', 'every week on mon,thu')
-  expect(sent?.url).toBe('/api/tasks/task_abc/series')
-  expect(sent?.init?.method).toBe('PUT')
-  expect(body()).toEqual({ rule: 'every week on mon,thu' })
-
-  await unrepeat('task_abc')
-  expect(sent?.url).toBe('/api/tasks/task_abc/series')
-  expect(sent?.init?.method).toBe('DELETE')
-})
-
-test('a mark is one date against the task, and answers what it made', async () => {
-  // Detaching answers a Task that did not exist before the request, which is
-  // how the screen knows it has somewhere new to go.
-  vi.stubGlobal('fetch', answering(201, { id: 'task_lifted' }))
-
-  const written = await mark('task_abc', 'detach', '2026-09-17')
-
-  expect(sent?.url).toBe('/api/tasks/task_abc/series/detach')
-  expect(sent?.init?.method).toBe('POST')
-  expect(body()).toEqual({ on: '2026-09-17' })
-  expect(written).toBe('task_lifted')
 })
 
 test('a breakdown turn carries everything already answered', async () => {
@@ -258,12 +138,13 @@ test('a breakdown turn carries everything already answered', async () => {
     answering(200, { proposals: [{ title: 'Sand it' }, { title: 'Sand it' }] }),
   )
 
-  const step = await breakdown('task_abc', [
+  const step = await breakdown('house-move', 'task_abc', [
     { question: 'How big is the fence?', answer: 'Six panels.' },
   ])
 
   expect(sent?.url).toBe('/api/breakdown')
   expect(body()).toEqual({
+    repo: 'house-move',
     task: 'task_abc',
     answers: [{ question: 'How big is the fence?', answer: 'Six panels.' }],
   })
@@ -272,169 +153,70 @@ test('a breakdown turn carries everything already answered', async () => {
   expect(step.proposals).toHaveLength(2)
 })
 
-test('lifting a date out carries the whole corrected task with the date', async () => {
-  vi.stubGlobal('fetch', answering(201, { id: 'task_lifted' }))
+const WRAPPED = task({
+  id: 'm3qc',
+  title: 'Wrap glassware',
+  state: 'doing',
+  tags: ['fragile'],
+  version: 'abc123',
+  attrs: [
+    { label: 'deadline', value: '2026-10-10' },
+    { label: 'blocked by', value: 'm3qb, v9t1' },
+    { label: 'attachment', value: '/a' },
+    { label: 'attachment', value: '/b' },
+    { label: 'reach', value: 'top shelf' },
+  ],
+})
 
-  const written = await detachEdited('task_abc', '2026-09-17', {
-    title: 'Water the plants twice',
-    why: 'it is hot',
+test('a task opens in the form with the attributes the read carries', () => {
+  const draft = draftOf('house-move', WRAPPED)
+
+  expect(draft.repo).toBe('house-move')
+  expect(draft.deadline).toBe('2026-10-10')
+  expect(draft.blockedBy).toEqual(['m3qb', 'v9t1'])
+  expect(draft.attach).toEqual(['/a', '/b'])
+  expect(draft.priority).toBe('')
+})
+
+// An edit sends what changed and nothing else, so an attribute the form does
+// not show, or one somebody else changed meanwhile, is left as it is.
+test('an edit sends the version and only what changed', async () => {
+  vi.stubGlobal('fetch', answering(200, { id: 'm3qc' }))
+  const before = draftOf('house-move', WRAPPED)
+
+  await editTask('m3qc', 'abc123', before, {
+    ...before,
+    priority: 'high',
+    tags: ['fragile', 'kitchen'],
+    attach: ['/b', '/c'],
   })
 
-  // Its own route rather than a fourth MARKS name, because it carries a whole
-  // Task where the three carry only the date.
-  expect(sent?.url).toBe('/api/tasks/task_abc/series/edit')
+  expect(sent?.url).toBe('/api/tasks/m3qc')
   expect(sent?.init?.method).toBe('POST')
   expect(body()).toEqual({
-    title: 'Water the plants twice',
-    why: 'it is hot',
-    on: '2026-09-17',
+    repo: 'house-move',
+    version: 'abc123',
+    priority: 'high',
+    tags: ['fragile', 'kitchen'],
+    attach: ['/c'],
+    detach: ['/a'],
   })
-  expect(written).toBe('task_lifted')
 })
 
-// `POST /api/tasks` refuses a field it does not know and `store.Attach` is a
-// guarded write against a Task that has to exist first, so the pointers are
-// split off the create and written one at a time after it.
-test('an attachment on the body is written after the task it is for', async () => {
-  const calls: { url: string; body: Record<string, unknown> }[] = []
-  vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
-    calls.push({
-      url,
-      body: JSON.parse(String(init?.body)) as Record<string, unknown>,
-    })
-    return Promise.resolve(
-      new Response(JSON.stringify({ id: 'task_abc' }), {
-        status: 201,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    )
-  })
+test('a delete names the repo and the version it read', async () => {
+  vi.stubGlobal('fetch', answering(200, { id: 'm3qc' }))
 
-  await addTask({ title: 'Paint the fence', attachments: ['/a', '/b'] })
+  await deleteTask('house-move', 'm3qc', 'abc123')
 
-  expect(calls.map((one) => one.url)).toEqual([
-    '/api/tasks',
-    '/api/tasks/task_abc/attachments',
-    '/api/tasks/task_abc/attachments',
-  ])
-  // The create carries no trace of them: the route would refuse the field.
-  expect(calls[0]?.body).toEqual({ title: 'Paint the fence' })
-  expect(calls.slice(1).map((one) => one.body)).toEqual([
-    { target: '/a' },
-    { target: '/b' },
-  ])
+  expect(sent?.url).toBe('/api/tasks/m3qc/delete')
+  expect(body()).toEqual({ repo: 'house-move', version: 'abc123' })
 })
 
-// The lift-out sheet is the same sheet, so it offers the same field. Before the
-// split reached this write the whole body went to a route that refuses a field
-// it does not know, so one pointer typed there was a 400 on the lift itself
-// rather than a pointer that failed to land.
-test('an attachment on a lifted-out date is written after the copy exists', async () => {
-  const calls: { url: string; body: Record<string, unknown> }[] = []
-  vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
-    calls.push({
-      url,
-      body: JSON.parse(String(init?.body)) as Record<string, unknown>,
-    })
-    return Promise.resolve(
-      new Response(JSON.stringify({ id: 'task_lifted' }), {
-        status: 201,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    )
-  })
+test('a stale write surfaces the conflict in the api words', async () => {
+  const sentence = "^m3qc's tree has changed since it was read; read it again"
+  vi.stubGlobal('fetch', answering(409, { error: sentence }))
 
-  const written = await detachEdited('task_abc', '2026-09-17', {
-    title: 'Water the plants twice',
-    attachments: ['/a'],
-  })
-
-  expect(calls.map((one) => one.url)).toEqual([
-    '/api/tasks/task_abc/series/edit',
-    '/api/tasks/task_lifted/attachments',
-  ])
-  expect(calls[0]?.body).toEqual({
-    title: 'Water the plants twice',
-    on: '2026-09-17',
-  })
-  expect(written).toBe('task_lifted')
-})
-
-// An edit already names the Task, so there is no id to wait for; what is pinned
-// here is the order, because a pointer sent with the PATCH would be refused by
-// a route that takes no such field.
-test('an attachment on an edit is written after the change', async () => {
-  const calls: { url: string; body: Record<string, unknown> }[] = []
-  vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
-    calls.push({
-      url,
-      body: JSON.parse(String(init?.body)) as Record<string, unknown>,
-    })
-    return Promise.resolve(
-      new Response(JSON.stringify({ id: 'task_abc' }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    )
-  })
-
-  await editTask('task_abc', { why: 'it is hot', attachments: ['/a'] })
-
-  expect(calls.map((one) => one.url)).toEqual([
-    '/api/tasks/task_abc',
-    '/api/tasks/task_abc/attachments',
-  ])
-  expect(calls[0]?.body).toEqual({ why: 'it is hot' })
-})
-
-// Every other way a submit fails leaves nothing behind, so a refused pointer
-// has to say that this one did not: the form would otherwise offer the same
-// button again and a second press would write a second Task.
-test('a refused attachment says the task was written', async () => {
-  let written = false
-  vi.stubGlobal('fetch', (url: string) => {
-    if (String(url).endsWith('/attachments')) {
-      return Promise.resolve(
-        new Response(JSON.stringify({ error: 'a pointer cannot be empty' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      )
-    }
-    written = true
-    return Promise.resolve(
-      new Response(JSON.stringify({ id: 'task_abc' }), {
-        status: 201,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    )
-  })
-
-  await expect(
-    addTask({ title: 'Paint the fence', attachments: ['/a', '/b'] }),
-  ).rejects.toThrow(/the task was written, and 0 of 2 attachments with it/)
-  expect(written).toBe(true)
-})
-
-// A Subtask is the same write with a parent, so it splits them the same way.
-// It has its own test because `Breakdown.test.tsx` mocks `addSubtask` whole,
-// which leaves nothing reaching this path.
-test('an attachment on a subtask is written after the subtask exists', async () => {
-  const calls: string[] = []
-  vi.stubGlobal('fetch', (url: string) => {
-    calls.push(String(url))
-    return Promise.resolve(
-      new Response(JSON.stringify({ id: 'task_kid' }), {
-        status: 201,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    )
-  })
-
-  await addSubtask('task_abc', { title: 'Sand it', attachments: ['/a'] })
-
-  expect(calls).toEqual([
-    '/api/tasks/task_abc/subtasks',
-    '/api/tasks/task_kid/attachments',
-  ])
+  await expect(deleteTask('house-move', 'm3qc', 'old')).rejects.toThrow(
+    sentence,
+  )
 })
