@@ -222,6 +222,11 @@ export function App() {
                     event.dataTransfer.effectAllowed = 'move'
                     event.dataTransfer.setData('text/plain', task.id)
                   }}
+                  // A card let go anywhere but a lane is no longer being
+                  // dragged, so a later drop of text or a file moves nothing.
+                  onDragEnd={() => {
+                    dragged.current = null
+                  }}
                 />
               ))}
             </section>
@@ -360,6 +365,7 @@ function Card({
   onOpen,
   onHold,
   onDragStart,
+  onDragEnd,
 }: {
   repo: Repo
   task: Task
@@ -368,6 +374,7 @@ function Card({
   onOpen: () => void
   onHold: () => void
   onDragStart: (event: DragEvent) => void
+  onDragEnd: () => void
 }) {
   const deadline = attr(task, 'deadline')
   const estimate = attr(task, 'estimate')
@@ -377,6 +384,7 @@ function Card({
       className="card"
       draggable={DESK && movable}
       onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       {...(movable ? hold : {})}
       // The Repo's own color, as its preamble names it. A word CSS cannot read
       // draws no edge rather than a wrong one.
