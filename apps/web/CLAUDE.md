@@ -8,10 +8,11 @@ static files that same process serves beside the JSON, so there is no second
 process and no CORS. `docs/adrs/0003-replace-the-tui-with-a-browser-client.md`
 records why the surface moved off the terminal.
 
-What it holds today (#119): the board, six State lanes of leaf-Task cards over
-every Repo, drawn from `GET /api/state` and read only. The box, the add sheet
-and the breakdown are kept unmounted for #123, which brings the Broker routes
-back; writes come with #121 and #122.
+What it holds today: the board, six State lanes of leaf-Task cards over every
+Repo, drawn from `GET /api/state` (#119), and a move, by dragging a card to a
+lane at a desk or holding it on a phone for Move to (#121). The box, the add
+sheet and the breakdown are kept unmounted for #123, which brings the Broker
+routes back; the other writes come with #122.
 
 ## Ownership
 
@@ -22,13 +23,17 @@ back; writes come with #121 and #122.
   holds the Narrowing and `queryString`, the one function that writes it as a
   query, plus the types the unmounted sheet still reads (`Offered`,
   `Collection`, `Level`) and `GET /api/files`'s shapes.
-- `src/write.ts` — the calls the sheet, the box and the breakdown make. No
-  route answers them until #121, #122 and #123; they stay so those components
-  keep compiling and their tests keep their grammar.
+- `src/write.ts` — `moveTask`, the one write the board makes, and the calls
+  the sheet, the box and the breakdown make. No route answers those until #122
+  and #123; they stay so those components keep compiling and their tests keep
+  their grammar.
+- `src/hold.ts` — `useHold`, a long press on touch: the timer, the buzz, and
+  the click after it stopped at the element.
+- `src/MoveTo.tsx` — Move to, the bottom sheet of six States a held card opens.
 - `src/read.ts` — the guard around a read a screen makes for itself, used by the
   sheet's file picker.
-- `src/App.tsx` — the board: the poll, the six lanes, the cards, and the
-  problems a Repo's file has. It is what `main.tsx` mounts.
+- `src/App.tsx` — the board: the poll, the six lanes, the cards, the moves,
+  and the problems and flags a Repo has. It is what `main.tsx` mounts.
 - `src/Box.tsx`, `src/Sheet.tsx`, `src/Breakdown.tsx` — the dump box, the add
   sheet and the breakdown, unmounted until #123.
 - `src/main.tsx` — the mount, and nothing else.
@@ -62,8 +67,16 @@ back; writes come with #121 and #122.
 - **A Repo whose file has problems is flagged, line by line.** The problems
   `tasks lint` reports arrive on the read and are drawn above the lanes; config
   errors are drawn the same way.
-- **Nothing on the board writes.** No button, field or checkbox; the only
-  request it makes is `GET /api/state`.
+- **A move is the board's one write.** At a desk (`pointer: fine`) a card is
+  draggable and a lane is a drop target. On touch a hold of `HOLD_MS` (450ms)
+  buzzes where `navigator.vibrate` exists, suppresses the browser's menu and
+  opens Move to, listing the six States with the card's own disabled; the
+  click the lifted finger sends is stopped at the card, so the hold opens
+  nothing else. A move does not redraw the card itself: the next poll does.
+  A refusal is drawn over the board in the API's words. Move to offers no
+  Reason; `tasks move -reason` does.
+- **A Repo's flags are drawn beside its problems.** `not pushed`, `not backed
+up` or why it refuses writes, as the read carries them in `flags`.
 - **A 304 is nothing to redraw, not an empty state.** `fetchState` returns
   `null` for one and the board keeps what it has; the ETag is handed back on
   the next poll, once a second.

@@ -2,10 +2,13 @@
 
 // The board: six State lanes of leaf-Task cards over every Repo, drawn from
 // what `GET /api/state` answered and nothing else. A parent is not a card of
-// its own; its title rides on each leaf under it. Nothing on the board writes.
+// its own; its title rides on each leaf under it. The one write on the board
+// is a move: a card dragged to a lane at a desk, or held on a phone and sent
+// through Move to.
 
 import {
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -40,6 +43,7 @@ const BOARD: Board = {
       path: '/home/n/code/house-move',
       color: 'green',
       problems: [],
+      flags: [],
       tasks: [
         task({
           id: 'm3qa',
@@ -82,6 +86,7 @@ const BOARD: Board = {
       path: '/home/n/code/work',
       color: '',
       problems: [{ line: 3, message: '"Write the report" has no id line' }],
+      flags: ['not backed up'],
       tasks: [task({ title: 'Write the report', state: 'inbox', line: 3 })],
     },
   ],
@@ -169,7 +174,7 @@ test('a Repo whose file has problems is flagged, line by line', async () => {
   expect(within(flagged).queryByText(/house-move/)).toBeNull()
 })
 
-test('nothing on the board writes', async () => {
+test('until a card is moved, the board only reads', async () => {
   render(<App />)
   await screen.findByText('Wrap glassware')
 
@@ -180,6 +185,157 @@ test('nothing on the board writes', async () => {
     expect(url).toBe('/api/state')
     expect(init?.method ?? 'GET').toBe('GET')
   }
+})
+
+test('a Repo whose tasks history is flagged says so', async () => {
+  render(<App />)
+
+  const flagged = await screen.findByRole('complementary', { name: 'Flags' })
+  expect(within(flagged).getByText('work: not backed up')).toBeDefined()
+  expect(within(flagged).queryByText(/house-move/)).toBeNull()
+})
+
+// The board's reads answer with BOARD, and every write with what is given.
+function writesAnswering(answer: { status: number; body: unknown }) {
+  vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+    asked.push({ url, init })
+    if ((init?.method ?? 'GET') === 'GET') {
+      return Promise.resolve(
+        new Response(JSON.stringify(BOARD), { headers: { ETag: '"1"' } }),
+      )
+    }
+    return Promise.resolve(
+      new Response(JSON.stringify(answer.body), { status: answer.status }),
+    )
+  })
+}
+
+const writes = () =>
+  asked
+    .filter(({ init }) => init?.method === 'POST')
+    .map(({ url, init }) => ({ url, body: JSON.parse(String(init?.body)) }))
+
+const HOLD_MS = 450
+
+async function hold(card: HTMLElement) {
+  fireEvent.pointerDown(card, {
+    pointerType: 'touch',
+    clientX: 10,
+    clientY: 10,
+  })
+  await new Promise((resolve) => setTimeout(resolve, HOLD_MS + 50))
+  fireEvent.pointerUp(card, { pointerType: 'touch' })
+}
+
+test('holding a card on a phone opens Move to, with its own State greyed', async () => {
+  writesAnswering({ status: 200, body: { id: 'm3qc' } })
+  const vibrate = vi.fn()
+  Object.defineProperty(navigator, 'vibrate', {
+    value: vibrate,
+    configurable: true,
+  })
+  render(<App />)
+  await screen.findByText('Wrap glassware')
+  const card = within(lane('Doing')).getByRole('article')
+
+  // A long press is not also a tap: the click a phone sends when the finger
+  // lifts goes no further than the card.
+  const tapped = vi.fn()
+  document.addEventListener('click', tapped)
+  await hold(card)
+  fireEvent.click(card)
+  document.removeEventListener('click', tapped)
+  expect(tapped).not.toHaveBeenCalled()
+  expect(vibrate).toHaveBeenCalled()
+
+  const sheet = screen.getByRole('dialog', { name: 'Move to' })
+  const states = within(sheet).getAllByRole('button', {
+    name: /^(Inbox|Backlog|Doing|Deferred|Done|Declined)$/,
+  })
+  expect(states.map((b) => b.textContent)).toEqual([
+    'Inbox',
+    'Backlog',
+    'Doing',
+    'Deferred',
+    'Done',
+    'Declined',
+  ])
+  expect(
+    states
+      .filter((b) => (b as HTMLButtonElement).disabled)
+      .map((b) => b.textContent),
+  ).toEqual(['Doing'])
+
+  fireEvent.click(within(sheet).getByRole('button', { name: 'Done' }))
+  await waitFor(() =>
+    expect(writes()).toEqual([
+      {
+        url: '/api/tasks/m3qc/move',
+        body: { repo: 'house-move', state: 'done' },
+      },
+    ]),
+  )
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+})
+
+test('a press let go early is a tap, and opens no sheet', async () => {
+  render(<App />)
+  const card = await screen.findByText('Wrap glassware')
+
+  fireEvent.pointerDown(card, { pointerType: 'touch' })
+  fireEvent.pointerUp(card, { pointerType: 'touch' })
+  await new Promise((resolve) => setTimeout(resolve, HOLD_MS + 50))
+  expect(screen.queryByRole('dialog')).toBeNull()
+})
+
+test('the browser menu a long press would open is not opened', async () => {
+  render(<App />)
+  await screen.findByText('Wrap glassware')
+  const card = within(lane('Doing')).getByRole('article')
+
+  expect(fireEvent.contextMenu(card)).toBe(false)
+})
+
+test('a card dragged to another lane is moved there', async () => {
+  writesAnswering({ status: 200, body: { id: 'v9t1' } })
+  render(<App />)
+  await screen.findByText('Book the van')
+  const van = within(lane('Backlog')).getByRole('article')
+  const dataTransfer = { setData: vi.fn(), effectAllowed: '', dropEffect: '' }
+
+  expect(van.getAttribute('draggable')).toBe('true')
+  fireEvent.dragStart(van, { dataTransfer })
+  fireEvent.dragOver(lane('Doing'), { dataTransfer })
+  fireEvent.drop(lane('Doing'), { dataTransfer })
+
+  await waitFor(() =>
+    expect(writes()).toEqual([
+      {
+        url: '/api/tasks/v9t1/move',
+        body: { repo: 'house-move', state: 'doing' },
+      },
+    ]),
+  )
+})
+
+test('a move the API refuses is said in its words', async () => {
+  writesAnswering({
+    status: 409,
+    body: { error: '^v9t1 is already in Doing, so somebody has taken it' },
+  })
+  render(<App />)
+  await screen.findByText('Book the van')
+  const van = within(lane('Backlog')).getByRole('article')
+  const dataTransfer = { setData: vi.fn(), effectAllowed: '', dropEffect: '' }
+
+  fireEvent.dragStart(van, { dataTransfer })
+  fireEvent.drop(lane('Doing'), { dataTransfer })
+
+  expect(
+    await screen.findByText(
+      '^v9t1 is already in Doing, so somebody has taken it',
+    ),
+  ).toBeDefined()
 })
 
 test('a config error is said over the board', async () => {

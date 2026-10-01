@@ -18,6 +18,11 @@ export const STATES: State[] = [
   'declined',
 ]
 
+/** A State as a lane's heading and a button say it. */
+export function named(state: State): string {
+  return state[0]?.toUpperCase() + state.slice(1)
+}
+
 /** One `- label: value` line under a title, other than `id` and `created`. */
 export type Attr = { label: string; value: string }
 
@@ -54,6 +59,11 @@ export type Repo = {
   color: string
   tasks: Task[]
   problems: Problem[]
+  /**
+   * What its tasks history is marked with: `not pushed`, `not backed up`, or
+   * the sentence saying why it refuses writes.
+   */
+  flags: string[]
 }
 
 /** A whole read: every Repo, and what was wrong with the config. */

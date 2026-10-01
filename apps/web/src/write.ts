@@ -1,10 +1,27 @@
-// The wire shapes the write and Broker routes took, and the calls that reach
-// them. No route answers any of them now: writes onto tasks.md land in #121
-// and #122, and the Broker's routes come back with #123, which mounts `Box`
-// and `Breakdown` again. They are kept so that work starts from them.
+// The calls that write. `moveTask` is the one the board makes. The rest are
+// the wire shapes the earlier write and Broker routes took: #122 brings the
+// other writes onto tasks.md, and #123 brings the Broker's routes back and
+// mounts `Box` and `Breakdown` again. They are kept so that work starts from
+// them.
 
 import { send, sentence } from './api'
-import { type Narrowing, queryString } from './state'
+import { type Narrowing, queryString, type State } from './state'
+
+/**
+ * Puts a Task in another State. The API holds every rule a move answers to,
+ * such as a Task already in Doing being taken, and refuses in its own words.
+ */
+export async function moveTask(
+  repo: string,
+  id: string,
+  state: State,
+): Promise<void> {
+  await send<{ id: string }>(
+    'POST',
+    `/api/tasks/${encodeURIComponent(id)}/move`,
+    { repo, state },
+  )
+}
 
 /**
  * A Task's attributes and its memberships as they are sent, and the same shape

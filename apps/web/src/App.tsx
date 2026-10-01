@@ -1,14 +1,19 @@
-import { useEffect, useState } from 'react'
+import { type DragEvent, useEffect, useRef, useState } from 'react'
 
 import { sentence } from './api'
+import { useHold } from './hold'
+import { MoveTo } from './MoveTo'
 import {
   type Board,
   fetchState,
+  named,
   type Repo,
+  type State,
   STATES,
   type Task,
   WIDE,
 } from './state'
+import { moveTask } from './write'
 
 // A Repo's tasks.md changing is what says something happened, so this polls
 // once a second over HTTP, and the ETag, hashed over the files' modification
@@ -20,12 +25,19 @@ const POLL_MS = 1000
  * what the read returned and works nothing out for itself: a Task's State,
  * whether it is Blocked and its parents' titles all arrive with it.
  *
- * Nothing on it writes. Writes come with #121 and #122, and the box and the
- * breakdown come back with #123.
+ * The one write it makes is a move: a card dragged to another lane at a desk,
+ * or held on a phone and sent through Move to. The next poll draws where it
+ * landed. The other writes come with #122, and the box and the breakdown come
+ * back with #123.
  */
 export function App() {
   const [board, setBoard] = useState<Board | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [refusal, setRefusal] = useState<string | null>(null)
+  const [moving, setMoving] = useState<Placed | null>(null)
+  // The card a drag picked up. It is kept here rather than in the drag's own
+  // data, which a browser hands back only on the drop.
+  const dragged = useRef<Placed | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -69,13 +81,33 @@ export function App() {
     }
   }, [])
 
+  const move = async ({ repo, task }: Placed, to: State) => {
+    setMoving(null)
+    if (task.state === to) return
+    try {
+      await moveTask(repo.name, task.id, to)
+      setRefusal(null)
+    } catch (caught) {
+      setRefusal(sentence(caught))
+    }
+  }
+
+  const drop = (to: State) => (event: DragEvent) => {
+    event.preventDefault()
+    const card = dragged.current
+    dragged.current = null
+    if (card) void move(card, to)
+  }
+
   const flagged = board?.repos.filter((repo) => repo.problems.length > 0) ?? []
+  const marked = board?.repos.filter((repo) => repo.flags.length > 0) ?? []
 
   return (
     <main className="board">
       {/* A failed poll takes nothing off the board: the sentence goes over
           the cards it interrupted. */}
       {error && <p className="message">{error}</p>}
+      {refusal && <p className="message">{refusal}</p>}
       {board?.errors.map((said) => (
         <p className="message" key={said}>
           {said}
@@ -95,6 +127,18 @@ export function App() {
           </ul>
         </aside>
       )}
+      {marked.length > 0 && (
+        <aside className="problems" aria-label="Flags">
+          <h2>Flags</h2>
+          <ul>
+            {marked.flatMap((repo) =>
+              repo.flags.map((flag) => (
+                <li key={`${repo.name}:${flag}`}>{`${repo.name}: ${flag}`}</li>
+              )),
+            )}
+          </ul>
+        </aside>
+      )}
       <div className="lanes">
         {STATES.map((state) => {
           const cards = (board?.repos ?? []).flatMap((repo) =>
@@ -102,9 +146,15 @@ export function App() {
               .filter((task) => task.leaf && task.state === state)
               .map((task) => ({ repo, task })),
           )
-          const name = state[0]?.toUpperCase() + state.slice(1)
+          const name = named(state)
           return (
-            <section className="lane" aria-label={name} key={state}>
+            <section
+              className="lane"
+              aria-label={name}
+              key={state}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={drop(state)}
+            >
               <h2>
                 {name} <small>{cards.length}</small>
               </h2>
@@ -113,26 +163,61 @@ export function App() {
                   key={`${repo.name}:${task.line}`}
                   repo={repo}
                   task={task}
+                  onHold={() => setMoving({ repo, task })}
+                  onDragStart={(event) => {
+                    dragged.current = { repo, task }
+                    event.dataTransfer.effectAllowed = 'move'
+                    event.dataTransfer.setData('text/plain', task.id)
+                  }}
                 />
               ))}
             </section>
           )
         })}
       </div>
+      {moving && (
+        <MoveTo
+          title={moving.task.title}
+          from={moving.task.state}
+          onMove={(to) => void move(moving, to)}
+          onCancel={() => setMoving(null)}
+        />
+      )}
     </main>
   )
 }
+
+/** A card as the board placed it: the Task, and the Repo it is in. */
+type Placed = { repo: Repo; task: Task }
+
+// A drag between lanes is for a mouse or a pen. On a phone a press on a card is
+// a scroll or a hold, never a drag.
+const DESK = window.matchMedia?.('(pointer: fine)').matches ?? true
 
 /**
  * One leaf Task. A parent is not a card of its own: its title is drawn above
  * each leaf under it, which is how a nested Task is placed on a flat lane.
  */
-function Card({ repo, task }: { repo: Repo; task: Task }) {
+function Card({
+  repo,
+  task,
+  onHold,
+  onDragStart,
+}: {
+  repo: Repo
+  task: Task
+  onHold: () => void
+  onDragStart: (event: DragEvent) => void
+}) {
   const deadline = attr(task, 'deadline')
   const estimate = attr(task, 'estimate')
+  const hold = useHold(onHold)
   return (
     <article
       className="card"
+      draggable={DESK}
+      onDragStart={onDragStart}
+      {...hold}
       // The Repo's own color, as its preamble names it. A word CSS cannot read
       // draws no edge rather than a wrong one.
       style={repo.color ? { borderInlineStartColor: repo.color } : undefined}

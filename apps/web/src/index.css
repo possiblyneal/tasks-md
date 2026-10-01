@@ -248,6 +248,9 @@ body {
   border-inline-start: 4px solid
     color-mix(in srgb, currentColor 30%, transparent);
   box-sizing: border-box;
+  /* A held card opens Move to, not the phone's own menu or a selection. */
+  -webkit-touch-callout: none;
+  user-select: none;
 }
 
 .parents {
@@ -266,4 +269,42 @@ body {
 
 .blocked {
   color: #c0392b;
+}
+
+/* Move to: the six States in a sheet from the bottom, within a thumb's reach. */
+.scrim {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  background: color-mix(in srgb, black 40%, transparent);
+}
+
+.move-to {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+  background: Canvas;
+  color: CanvasText;
+  box-sizing: border-box;
+}
+
+.move-to h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.move-to p {
+  margin: 0 0 0.25rem;
+}
+
+.move-to button {
+  min-height: 44px;
+  font: inherit;
+}
+
+.move-to .cancel {
+  margin-top: 0.5rem;
 }
