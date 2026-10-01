@@ -40,6 +40,7 @@ func Pass(today time.Time, dirs ...string) {
 			if err != nil {
 				return "", "", err
 			}
+			fill(f)
 			done := due(f, today)
 			return taskfile.Write(f), strings.Join(done, ", "), nil
 		})

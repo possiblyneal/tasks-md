@@ -142,6 +142,7 @@ color: green
   - [x] Buy boxes | done
     - id: m3qb
     - created: 2026-09-20
+    - ended: ` + today() + `
   - [x] Wrap glassware | done #kitchen
     - id: m3qc
     - created: 2026-09-20
@@ -173,6 +174,7 @@ color: green
   - [x] Buy boxes | done
     - id: m3qb
     - created: 2026-09-20
+    - ended: ` + today() + `
 `
 	if got := read(t, filepath.Join(repo, "TASKS.md")); got != reopened {
 		t.Errorf("after reopening m3qc, TASKS.md =\n%s\nwant\n%s", got, reopened)

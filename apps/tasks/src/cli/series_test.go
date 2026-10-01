@@ -241,6 +241,52 @@ func TestASeriesInsideAnEndedSeriesRepeatsOnlyWithIt(t *testing.T) {
 	}
 }
 
+func TestThePassFillsHandTypedTasksWhenItWrites(t *testing.T) {
+	code := gitHome(t, map[string]string{"errands": `# Tasks
+
+- [ ] Renew the passport | deferred
+  - id: pp01
+  - created: 2026-09-01
+  - until: 2026-10-01
+- [ ] Post the forms | backlog
+- [x] Buy stamps | done
+  - id: st01
+  - created: 2026-09-01
+`})
+	repo := filepath.Join(code, "errands")
+	at(t, "2026-10-01")
+
+	listing(t)
+	file := read(t, filepath.Join(repo, "TASKS.md"))
+	// The wake is what makes the pass write; the write then fills what a hand
+	// left out, as any other write does, and dates a hand-ticked end.
+	if !strings.Contains(file, "- [ ] Post the forms | backlog\n  - id: ") {
+		t.Errorf("TASKS.md =\n%s\nwant the hand-typed Task given an id", file)
+	}
+	if !strings.Contains(file, "- [x] Buy stamps | done\n  - id: st01\n  - created: 2026-09-01\n  - ended: ") {
+		t.Errorf("TASKS.md =\n%s\nwant the hand-ticked Task given an ended date", file)
+	}
+}
+
+func TestRepeatFillsHandTypedTasks(t *testing.T) {
+	code := gitHome(t, map[string]string{"home": `# Tasks
+
+- [ ] Water the plants | backlog
+  - id: wat1
+  - created: 2026-09-01
+- [ ] Feed the cat | backlog
+`})
+	repo := filepath.Join(code, "home")
+	at(t, "2026-10-01")
+
+	if status, _, errs := run(t, "repeat", "-repo", "home", "wat1", "every", "week", "from", "2026-10-05"); status != 0 {
+		t.Fatalf("tasks repeat exited %d: %s", status, errs)
+	}
+	if file := read(t, filepath.Join(repo, "TASKS.md")); !strings.Contains(file, "- [ ] Feed the cat | backlog\n  - id: ") {
+		t.Errorf("TASKS.md =\n%s\nwant the hand-typed Task given an id", file)
+	}
+}
+
 func TestARuleThatHasRunOutEndsTheSeries(t *testing.T) {
 	code := gitHome(t, map[string]string{"home": `# Tasks
 

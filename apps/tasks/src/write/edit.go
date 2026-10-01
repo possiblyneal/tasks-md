@@ -259,6 +259,10 @@ func fill(f *taskfile.File) {
 		if t.Created == "" {
 			t.Created = today()
 		}
+		// A hand-ticked end is dated when it is found, so it is counted.
+		if t.State.Ended() && t.Attr("ended") == "" {
+			set(t, "ended", today())
+		}
 	})
 }
 
