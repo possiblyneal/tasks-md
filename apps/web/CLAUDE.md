@@ -60,8 +60,9 @@ iPhone's home screen as a PWA, and offline shows the last board read.
 - `src/main.tsx` — the mount, and the service worker's registration in a
   build.
 - `src/offline.ts` — what the service worker answers each request with, and
-  `keep`, which holds the page and the files it loads. `OFFLINE` is the header
-  a board read answered from the cache carries, which `fetchState` reads.
+  `keep`, which holds the page and the files it loads, and keeps nothing from
+  an answer that is not ok. `OFFLINE` is the header a board read answered
+  from the cache carries, which `fetchState` reads.
 - `src/sw.ts` — the service worker's wiring, built to `/sw.js`.
 - `src/public/` — Vite's `publicDir`, copied to the build's root unhashed:
   `manifest.json` and the icons. `icon.svg` is the source; the PNGs are

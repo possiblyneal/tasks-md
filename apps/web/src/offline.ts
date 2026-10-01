@@ -38,13 +38,16 @@ export function answer(
 /**
  * Keeps `response` as the page and the files it loads, fetching only those not
  * kept already, and drops the files an older page loaded. Vite names each
- * file by its hash, so one kept is never stale.
+ * file by its hash, so one kept is never stale. A response that is not ok
+ * keeps nothing: a 502 mid-deploy names no files, and keeping it would drop
+ * every one the working page loads.
  */
 export async function keep(
   cache: Kept,
   fetcher: Fetch,
   response: Response,
 ): Promise<void> {
+  if (!response.ok) return
   const html = await response.clone().text()
   const loads = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map(
     (m) => m[1] ?? '',
