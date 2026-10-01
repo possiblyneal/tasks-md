@@ -190,9 +190,21 @@ test('Enter in the attachment box attaches rather than submitting', () => {
   const sheet = opened({ title: 'Buy milk' })
   const box = screen.getByLabelText('New attachment')
   fireEvent.change(box, { target: { value: '/receipt.pdf' } })
-  fireEvent.keyDown(box, { key: 'Enter' })
+  // jsdom never submits a form on Enter, so what stops the submit is the
+  // default being prevented, which keyDown answers with false.
+  expect(fireEvent.keyDown(box, { key: 'Enter' })).toBe(false)
   expect(screen.getByText('/receipt.pdf')).toBeTruthy()
   expect(sheet.submit().attach).toEqual(['/receipt.pdf'])
+})
+
+// The Enter that picks a word from an IME's candidates is the IME's, not ours.
+test('Enter while composing neither attaches nor is prevented', () => {
+  const sheet = opened({ title: 'Buy milk' })
+  const box = screen.getByLabelText('New attachment')
+  fireEvent.change(box, { target: { value: '/領収書' } })
+  expect(fireEvent.keyDown(box, { key: 'Enter', isComposing: true })).toBe(true)
+  expect(screen.queryByText('/領収書')).toBeNull()
+  expect(sheet.submit().attach).toEqual([])
 })
 
 test('offline, the form cannot be submitted', () => {

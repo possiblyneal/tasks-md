@@ -389,8 +389,9 @@ function Pointers({
           onChange={(event) => setTarget(event.target.value)}
           onKeyDown={(event) => {
             // Enter here collects the pointer; it would otherwise submit the
-            // form without it.
-            if (event.key !== 'Enter') return
+            // form without it. An Enter that picks an IME's candidate is the
+            // IME's.
+            if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
             event.preventDefault()
             add()
           }}
