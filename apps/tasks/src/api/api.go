@@ -18,8 +18,10 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"time"
 
 	"github.com/possiblyneal/tasks-md/apps/tasks/src/board"
+	"github.com/possiblyneal/tasks-md/apps/tasks/src/repos"
 	"github.com/possiblyneal/tasks-md/apps/tasks/src/write"
 )
 
@@ -33,22 +35,47 @@ import (
 //
 // Actor is who every write through the listener is made as, resolved once
 // when it starts.
+//
+// Now is the host's clock the pass reads today from, and After the timer the
+// midnight pass waits on; nil is the real ones. Like Browse, they are test
+// seams rather than operator knobs.
 type Options struct {
 	Addr   string
 	Web    string
 	Browse string
 	Actor  string
+	Now    func() time.Time
+	After  func(time.Duration) <-chan time.Time
+}
+
+func (o Options) now() time.Time {
+	if o.Now == nil {
+		return time.Now()
+	}
+	return o.Now()
+}
+
+func (o Options) after(d time.Duration) <-chan time.Time {
+	if o.After == nil {
+		return time.After(d)
+	}
+	return o.After(d)
 }
 
 // Handler is every route, and it is what a test exercises without a listener.
 func Handler(o Options) http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/state", state)
+	mux.HandleFunc("GET /api/state", func(w http.ResponseWriter, r *http.Request) {
+		state(o, w, r)
+	})
 	mux.HandleFunc("POST /api/tasks", func(w http.ResponseWriter, r *http.Request) {
-		add(o.Actor, w, r)
+		add(o, w, r)
 	})
 	mux.HandleFunc("POST /api/tasks/{id}/move", func(w http.ResponseWriter, r *http.Request) {
-		move(o.Actor, w, r)
+		move(o, w, r)
+	})
+	mux.HandleFunc("GET /api/tasks/{id}/series", func(w http.ResponseWriter, r *http.Request) {
+		series(o, w, r)
 	})
 	// The one route reading outside the Repos. It lists and never opens, and
 	// what it lists is the machine a pointer resolves against rather than the
@@ -79,7 +106,34 @@ func Handler(o Options) http.Handler {
 func ListenAndServe(o Options, stderr io.Writer) error {
 	fmt.Fprintf(stderr, "tasks api: listening on %s\n", o.Addr)
 	srv := &http.Server{Addr: o.Addr, Handler: Handler(o)}
+	go nightly(o, nil)
 	return srv.ListenAndServe()
+}
+
+// nightly runs the pass over every Repo one second past each local midnight,
+// so a file is a day's work behind at most even when nothing reads it, until
+// stop is closed.
+func nightly(o Options, stop <-chan struct{}) {
+	for {
+		now := o.now()
+		midnight := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 1, 0, now.Location())
+		select {
+		case <-stop:
+			return
+		case <-o.after(midnight.Sub(now)):
+		}
+		found, _ := board.Discover()
+		pass(o, found...)
+	}
+}
+
+// pass runs the pass over the Repos a request is about to read or write.
+func pass(o Options, found ...repos.Repo) {
+	dirs := make([]string, len(found))
+	for i, r := range found {
+		dirs[i] = r.Path
+	}
+	write.Pass(o.now(), dirs...)
 }
 
 // client serves the compiled client, falling back to index.html for a path

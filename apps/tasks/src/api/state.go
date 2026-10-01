@@ -19,7 +19,7 @@ import (
 // names `tasks list` takes its flags under, each Repo carrying its problems.
 // The Repos are rescanned and every file re-read on each request, so a new
 // Repo or a pull shows without a restart.
-func state(w http.ResponseWriter, r *http.Request) {
+func state(o Options, w http.ResponseWriter, r *http.Request) {
 	// The query is refused before the ETag is looked at, because the ETag
 	// block answers without reading: `If-None-Match: *` under a State there is
 	// not would otherwise be told nothing changed about a view it can never
@@ -32,10 +32,13 @@ func state(w http.ResponseWriter, r *http.Request) {
 
 	found, errs := board.Discover()
 	// An unknown Repo is refused before the ETag for the reason a bad query is.
-	if _, err := board.Only(found, n.Repo); err != nil {
+	only, err := board.Only(found, n.Repo)
+	if err != nil {
 		fail(w, err)
 		return
 	}
+	// The pass goes ahead of the ETag, because what it writes changes the files.
+	pass(o, only...)
 	tag := version(found, errs, r.URL.RawQuery)
 	if matches(r.Header.Values("If-None-Match"), tag) {
 		w.Header().Set("ETag", tag)
