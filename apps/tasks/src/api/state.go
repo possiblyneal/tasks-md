@@ -49,14 +49,14 @@ func state(w http.ResponseWriter, r *http.Request) {
 	}
 	// The ETag goes on the response that was actually sent, never on an error.
 	w.Header().Set("ETag", tag)
-	send(w, http.StatusOK, board.Board{Repos: read, Errors: board.Errors(errs)})
+	send(w, http.StatusOK, board.Of(read, errs))
 }
 
 // narrowing reads a Narrowing out of the query. A repeated parameter is a set,
 // and an empty one narrows nothing.
 func narrowing(r *http.Request) (board.Narrowing, error) {
 	q := r.URL.Query()
-	n := board.Narrowing{Repo: q.Get("repo"), Search: q.Get("search")}
+	n := board.Narrowing{Repo: q.Get("repo"), Search: q.Get("search"), Sort: board.Sort(q.Get("sort"))}
 	for _, s := range q["state"] {
 		if s != "" {
 			n.States = append(n.States, taskfile.State(s))
@@ -81,11 +81,13 @@ func narrowing(r *http.Request) (board.Narrowing, error) {
 }
 
 // version is the ETag: every Repo found, its file's modification time and
-// size, the config errors, and the query, hashed. Any of them changing is a
-// different response, so none can be answered 304 for another. A file that
-// cannot be stat'd hashes as such and is read, and reported, by the read.
+// size, the config errors, the query and the host's date, hashed. Any of them
+// changing is a different response, so none can be answered 304 for another:
+// past midnight a Deadline that was today is Overdue. A file that cannot be
+// stat'd hashes as such and is read, and reported, by the read.
 func version(found []repos.Repo, errs []error, query string) string {
 	h := sha256.New()
+	fmt.Fprintln(h, board.Today())
 	for _, r := range found {
 		fmt.Fprintf(h, "%s\x00%s\x00", r.Name, r.Path)
 		if info, err := os.Stat(r.File()); err == nil {

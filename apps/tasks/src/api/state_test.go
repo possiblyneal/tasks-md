@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -147,6 +148,31 @@ func TestStateNarrowsTheWayTasksListDoes(t *testing.T) {
 	}
 }
 
+// The sorts on offer and the host's today travel with the read, so a surface
+// neither keeps its own list of sorts nor takes the date from a phone set to
+// another time zone. ?sort= orders the read the way -sort orders `tasks list`.
+func TestStateServesTheSortsAndToday(t *testing.T) {
+	homeWith(t, map[string]string{"house-move": houseMove, "work": work})
+	h := Handler(Options{})
+
+	body := decodeState(t, get(t, h, "/api/state", nil))
+	if fmt.Sprint(body.Sorts) != "[file title deadline created priority estimate]" {
+		t.Errorf("sorts = %v", body.Sorts)
+	}
+	if body.Today != time.Now().Format(time.DateOnly) {
+		t.Errorf("today = %q, want the host's local date", body.Today)
+	}
+
+	sorted := decodeState(t, get(t, h, "/api/state?sort=title", nil))
+	if van := sorted.Repos[0].Tasks[0]; van.Title != "Book the van" || van.Rank != 0 {
+		t.Errorf("by title, house-move starts %+v, want the van ranked first", van)
+	}
+	// Ranked across both files: Book, Pack, Wrap, then Write.
+	if report := sorted.Repos[1].Tasks[0]; report.Rank != 3 {
+		t.Errorf("the report's rank = %d, want 3", report.Rank)
+	}
+}
+
 func TestStateRefusesWhatItCannotAnswer(t *testing.T) {
 	homeWith(t, map[string]string{"work": work})
 	h := Handler(Options{})
@@ -154,6 +180,7 @@ func TestStateRefusesWhatItCannotAnswer(t *testing.T) {
 		"?repo=nowhere":    http.StatusNotFound,
 		"?state=someday":   http.StatusBadRequest,
 		"?unblocked=maybe": http.StatusBadRequest,
+		"?sort=colour":     http.StatusBadRequest,
 	} {
 		w := get(t, h, "/api/state"+query, http.Header{"If-None-Match": {"*"}})
 		if w.Code != status || !strings.Contains(w.Body.String(), `"error"`) {

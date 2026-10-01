@@ -52,6 +52,7 @@ func list(args []string, stdout, stderr io.Writer) int {
 	fs.Var(&tags, "tag", "only Tasks carrying this Tag, repeatable")
 	fs.StringVar(&n.Search, "search", "", "only Tasks whose id, title or description holds this text")
 	fs.BoolVar(&n.Unblocked, "unblocked", false, "leave Blocked Tasks out")
+	sort := fs.String("sort", string(board.SortFile), "order siblings by one of: "+strings.Join(sortWords(), ", "))
 	asJSON := fs.Bool("json", false, "print JSON")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -64,6 +65,7 @@ func list(args []string, stdout, stderr io.Writer) int {
 		n.States = append(n.States, taskfile.State(s))
 	}
 	n.Tags = tags
+	n.Sort = board.Sort(*sort)
 	if err := n.Check(); err != nil {
 		fmt.Fprintf(stderr, "tasks list: %v\n", err)
 		return 2
@@ -80,7 +82,7 @@ func list(args []string, stdout, stderr io.Writer) int {
 	if *asJSON {
 		enc := json.NewEncoder(stdout)
 		enc.SetIndent("", "  ")
-		if err := enc.Encode(board.Board{Repos: read, Errors: board.Errors(errs)}); err != nil {
+		if err := enc.Encode(board.Of(read, errs)); err != nil {
 			fmt.Fprintf(stderr, "tasks list: %v\n", err)
 			return 1
 		}
@@ -111,6 +113,14 @@ func list(args []string, stdout, stderr io.Writer) int {
 func stateWords() []string {
 	words := make([]string, len(taskfile.States))
 	for i, s := range taskfile.States {
+		words[i] = string(s)
+	}
+	return words
+}
+
+func sortWords() []string {
+	words := make([]string, len(board.Sorts))
+	for i, s := range board.Sorts {
 		words[i] = string(s)
 	}
 	return words
