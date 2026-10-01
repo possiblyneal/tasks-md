@@ -18,8 +18,9 @@ iPhone's home screen as a PWA, and offline shows the last board read.
 
 ## Ownership
 
-- `src/api.ts` — the fetch plumbing every call shares: one JSON body out and
-  one back, and the one place a failed response becomes an Error.
+- `src/api.ts` — the fetch plumbing every call shares: `get`, one JSON body
+  back, and `send`, one out and one back, and the one place a failed response
+  becomes an Error.
 - `src/state.ts` — the wire shapes and the one read the board makes. It mirrors
   `apps/tasks/src/board/board.go`, which is the side that decides them. It
   holds the Narrowing and `queryString`, the one function that writes it as a
