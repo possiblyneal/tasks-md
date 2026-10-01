@@ -22,13 +22,13 @@ SQLite store, the Lease and the Change History as a stored record are retired.
   that is not already a git repository.
 - **Concurrency** is a stale-write refusal: a write made against an older copy
   of the file is rejected and the writer re-reads. Nothing is silently lost.
-- **Only `todo` writes `tasks.md`**, by convention: the markdown is there to be
+- **Only `tasks` writes `tasks.md`**, by convention: the markdown is there to be
   read and browsed, and the verbs carry the refusal and the commit. A direct
   edit cannot be prevented for a process running as the operator, so one that
   gets through is picked up and committed with its Actor unknown, but it is off
-  the path, and `todo lint` may reject it. Amended 2026-09-30 (#115), replacing
+  the path, and `tasks lint` may reject it. Amended 2026-09-30 (#115), replacing
   "a direct edit is still valid".
-- **Discovery** scans root folders on the host running `todo api`. That host's
+- **Discovery** scans root folders on the host running `tasks api`. That host's
   checkouts are the Tasks the web page sees; other clones
   converge through ordinary git pull and push.
 - **No outside sync.** The web page, laid out for a phone first, is how a
@@ -73,5 +73,5 @@ thing that prevented all three.
   read-only by convention keeps that rare; the operator's own Claude Code
   settings deny its Edit and Write tools on `tasks.md`, which steers an Agent to
   the verbs but does not stop a shell write.
-- Because only `todo` writes the file, the parser and `todo lint` may be strict
+- Because only `tasks` writes the file, the parser and `tasks lint` may be strict
   about its format rather than tolerating hand-typed variations.

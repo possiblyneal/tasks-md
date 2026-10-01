@@ -1,4 +1,4 @@
-# Todo
+# Tasks
 
 A task tracker with two kinds of consumer: a person at a keyboard, and agents that add, edit, and delete while nobody is watching. The language below exists to keep those two from meaning different things by the same word.
 
@@ -27,7 +27,7 @@ A single piece of work the tracker holds, always in exactly one State. There is 
 _Avoid_: Todo, item, entry, ticket
 
 **State**:
-Where a Task stands: Inbox, Backlog, Doing, Deferred, Done or Declined. A Task with no Subtasks moves from any State to any other, and a Subtask has the same six. A parent's State is worked out from its Subtasks and never set: while any has not ended, it is the first of Doing, Backlog, Inbox and Deferred that one of them is in; once all have ended, it is Declined if every one was Declined and Done otherwise. So a parent ends only once every Subtask beneath it has ended, and it ends on the day the last of them did. `todo` writes a parent's State into its line like any other; a line that says otherwise is shown as breaking the rule, and the State worked out is the one that counts. A Task added without a State named is in Inbox, whoever added it. Done and Declined are the two that **end** a Task.
+Where a Task stands: Inbox, Backlog, Doing, Deferred, Done or Declined. A Task with no Subtasks moves from any State to any other, and a Subtask has the same six. A parent's State is worked out from its Subtasks and never set: while any has not ended, it is the first of Doing, Backlog, Inbox and Deferred that one of them is in; once all have ended, it is Declined if every one was Declined and Done otherwise. So a parent ends only once every Subtask beneath it has ended, and it ends on the day the last of them did. `tasks` writes a parent's State into its line like any other; a line that says otherwise is shown as breaking the rule, and the State worked out is the one that counts. A Task added without a State named is in Inbox, whoever added it. Done and Declined are the two that **end** a Task.
 _Avoid_: Status, column, lane, stage
 
 **Inbox**:
@@ -63,7 +63,7 @@ A Task nested under another Task, to five levels. A Subtask is fixed where it wa
 _Avoid_: Child task, step, checklist item
 
 **Repo**:
-A folder holding a tasks.md, whether or not it holds code, standing for where the work sits: a house move, a job, a codebase. Only a folder directly inside one of the configured roots (by default `~/code`), or a link placed there, is a Repo; a tasks.md any deeper is not. A Task lives in exactly one Repo. Its tasks.md belongs to the folder rather than to any branch of the folder's code: switching branches leaves it as it is, and `todo` run from a linked worktree reads and writes the main checkout's.
+A folder holding a tasks.md, whether or not it holds code, standing for where the work sits: a house move, a job, a codebase. Only a folder directly inside one of the configured roots (by default `~/code`), or a link placed there, is a Repo; a tasks.md any deeper is not. A Task lives in exactly one Repo. Its tasks.md belongs to the folder rather than to any branch of the folder's code: switching branches leaves it as it is, and `tasks` run from a linked worktree reads and writes the main checkout's.
 _Avoid_: List, project, folder, category, bucket
 
 **Tag**:
@@ -115,7 +115,7 @@ _Avoid_: Instance, event, repetition
 ### Change History
 
 **Change History**:
-The git history of each Repo's tasks.md, kept apart from the Repo's code history and pushed after every write, one entry per write, each naming its Actor. It is kept rather than collapsed, and it is a record of the file rather than the store: the file is what counts, and the history says how it got that way. Only `todo` writes the file; it is there to be read. A change that is made by hand anyway, outside `todo`, enters the history as a direct edit whose Actor is unknown, and nothing tries to name one.
+The git history of each Repo's tasks.md, kept apart from the Repo's code history and pushed after every write, one entry per write, each naming its Actor. It is kept rather than collapsed, and it is a record of the file rather than the store: the file is what counts, and the history says how it got that way. Only `tasks` writes the file; it is there to be read. A change that is made by hand anyway, outside `tasks`, enters the history as a direct edit whose Actor is unknown, and nothing tries to name one.
 _Avoid_: Log, audit log, journal, event stream
 
 **Actor**:
@@ -131,9 +131,9 @@ _Avoid_: Bot, worker, daemon, service
 ### Outside the contexts
 
 **Broker**:
-The thing that infers, reached over the network and owned by none of the three contexts. It is shown Tasks and answers with questions, proposals, or one Task read out of a dump; it holds nothing between calls, is never an Actor, and never writes. A proposal becomes a Task only when a person approves it, and the write is attributed to that person. A Task read out of a dump is not a proposal: it is what somebody already said they wanted, so running `todo capture` over their own words is the approval, and the write is attributed to them the same way.
+The thing that infers, reached over the network and owned by none of the three contexts. It is shown Tasks and answers with questions, proposals, or one Task read out of a dump; it holds nothing between calls, is never an Actor, and never writes. A proposal becomes a Task only when a person approves it, and the write is attributed to that person. A Task read out of a dump is not a proposal: it is what somebody already said they wanted, so running `tasks capture` over their own words is the approval, and the write is attributed to them the same way.
 _Avoid_: The box, the agent, the AI, the model, the assistant
 
 **Dump**:
-What somebody says a Task is, in their own words and in one box, before any field is filled in. The Broker reads one and answers with the Task it describes, so what comes back is that person's own words sorted into attributes rather than a suggestion of work nobody asked for. A dump amending a Task carries that Task as it stands and comes back whole. The Broker's answer names a Repo, which a person approves on the form; `todo capture` writes to the Repo its caller names and never to the Broker's guess.
+What somebody says a Task is, in their own words and in one box, before any field is filled in. The Broker reads one and answers with the Task it describes, so what comes back is that person's own words sorted into attributes rather than a suggestion of work nobody asked for. A dump amending a Task carries that Task as it stands and comes back whole. The Broker's answer names a Repo, which a person approves on the form; `tasks capture` writes to the Repo its caller names and never to the Broker's guess.
 _Avoid_: Prompt, note, request
