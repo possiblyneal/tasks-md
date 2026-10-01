@@ -8,11 +8,12 @@ static files that same process serves beside the JSON, so there is no second
 process and no CORS. `docs/adrs/0003-replace-the-tui-with-a-browser-client.md`
 records why the surface moved off the terminal.
 
-What it holds today: the board, six State lanes of leaf-Task cards over every
-Repo, drawn from `GET /api/state` (#119), and a move, by dragging a card to a
-lane at a desk or holding it on a phone for Move to (#121). The box, the add
-sheet and the breakdown are kept unmounted for #123, which brings the Broker
-routes back; the other writes come with #122.
+What it holds today (#119, #120, #121): the board, six State lanes of
+leaf-Task cards over every Repo, drawn from `GET /api/state`, with Repo and Tag
+chips, a search box, a sort picker, a read-only panel a card opens into, and a
+move, by dragging a card to a lane at a desk or holding it on a phone for Move
+to. The box, the add sheet and the breakdown are kept unmounted for #123, which
+brings the Broker routes back; the other writes come with #122.
 
 ## Ownership
 
@@ -32,13 +33,23 @@ routes back; the other writes come with #122.
 - `src/MoveTo.tsx` — Move to, the bottom sheet of six States a held card opens.
 - `src/read.ts` — the guard around a read a screen makes for itself, used by the
   sheet's file picker.
-- `src/App.tsx` — the board: the poll, the six lanes, the cards, the moves,
-  and the problems and flags a Repo has. It is what `main.tsx` mounts.
+- `src/App.tsx` — the board: the six lanes, the cards, the moves, the
+  problems and flags a Repo has, and which panel is open. It is what
+  `main.tsx` mounts.
+- `src/poll.ts` — `usePoll`, the once-a-second read of `GET /api/state` under
+  one Narrowing.
+- `src/Narrow.tsx` — the Repo chips, Tag chips, search box and sort picker.
+- `src/Panel.tsx` — the read-only panel: every attribute, the parent with its
+  leaf counts per State, and the Subtasks.
+- `src/Due.tsx` — a Deadline marked today or Overdue against the served
+  `today`.
 - `src/Box.tsx`, `src/Sheet.tsx`, `src/Breakdown.tsx` — the dump box, the add
   sheet and the breakdown, unmounted until #123.
 - `src/main.tsx` — the mount, and nothing else.
-- `src/App.test.tsx`, `src/Box.test.tsx`, `src/Sheet.test.tsx`,
-  `src/Breakdown.test.tsx` — the components with a grammar.
+- `src/App.test.tsx`, `src/Narrow.test.tsx`, `src/Panel.test.tsx`,
+  `src/Box.test.tsx`, `src/Sheet.test.tsx`, `src/Breakdown.test.tsx` — the
+  components with a grammar. `src/testing.ts` is the board fixture and the
+  mocked fetch the board's tests share.
 - `src/state.test.ts`, `src/write.test.ts` — what a Narrowing becomes as a
   query, what a read does with a `304` and a refusal, and what a write sends.
 - `src/index.css` — the whole of the styling. There is no component-level
@@ -63,10 +74,33 @@ routes back; the other writes come with #122.
   rides above each leaf under it, outermost first, which is how a nested Task
   sits on a flat lane. A card names its Repo, and its edge is the Repo's color.
 - **One board over every Repo.** The lanes are the six States in
-  `state.STATES` order, and every Repo's leaves share them.
+  `state.STATES` order, and every Repo's leaves share them, ordered by the
+  read's `rank`. Each lane header counts its cards.
+- **Narrowing is the server's.** Every chip, the search box and the sort
+  picker set a field of the Narrowing, and the lanes are the read made under
+  it, so they match `tasks list` under the same flags. Repo chips are one at a
+  time, because a read names one Repo or all; Tag chips are any-of. The sorts
+  offered are the read's `sorts`; `file` is the bare path.
+- **Two reads.** The wide read draws the chips, the flags and the panel, which
+  need every Repo, Tag and parent whatever is narrowed; the narrowed read draws
+  the lanes and is not made while nothing is narrowed. A narrowed board is
+  drawn only under the narrowing it answered.
+- **Today is the host's.** The read's `today` is what a Deadline is due today
+  or Overdue against, never the browser's clock.
+- **A card opens a read-only panel.** A bottom sheet 88% of a phone's height,
+  a side panel at a desk. It shows every attribute; a Subtask's opens on its
+  parent, with the parent's State and its leaves per State
+  (`Doing 1 · Backlog 2 · Done 3`), and the parent opens its own panel. The
+  tree is read from the wide read in file order. A card without an id is not
+  opened.
+- **The address names the open panel.** `?task=<id>&repo=<name>` opens one on
+  load, since an id is unique only within its Repo; with no `repo` the first
+  Repo holding the id is used. Opening and closing replace the address.
+- **Colors are tokens on `:root`,** redefined under
+  `prefers-color-scheme: dark`, so light and dark follow the OS.
 - **A Repo whose file has problems is flagged, line by line.** The problems
-  `tasks lint` reports arrive on the read and are drawn above the lanes; config
-  errors are drawn the same way.
+  `tasks lint` reports arrive on the read and are drawn above the lanes, and
+  the Repo's chip is marked; config errors are drawn the same way.
 - **A move is the board's one write.** At a desk (`pointer: fine`) a card is
   draggable and a lane is a drop target. On touch a hold of `HOLD_MS` (450ms)
   buzzes where `navigator.vibrate` exists, suppresses the browser's menu and
@@ -91,8 +125,9 @@ up` or why it refuses writes, as the read carries them in `flags`.
   `fetchState` both build their query from a Narrowing through `queryString`,
   so a narrowing added there is on both.
 - **Touch targets no smaller than 44px, one thumb, no hover — at every width.**
-  The lanes scroll across and snap one at a time, so a phone shows one lane and
-  most of the next.
+  On a phone each lane is most of a screen wide and they scroll across,
+  snapping one at a time with the next one's edge in view; from 64rem the six
+  sit across as columns.
 
 ## Work Guidance
 
@@ -104,8 +139,8 @@ up` or why it refuses writes, as the read carries them in `flags`.
   unrun and reports `unavailable`, which fails the gate.
 - No `public/`: `scripts/structure` reads a folder under a unit that is neither
   `src/` nor a scoped folder as a domain and requires a `src/` inside it.
-- The screens #119 deleted (detail, Series, collections, activity, the log) are
-  in git history for #120 and #122 to recover from.
+- The screens #119 deleted (Series, collections, activity, the log) are in
+  git history for #122 to recover from.
 
 ## Verification
 

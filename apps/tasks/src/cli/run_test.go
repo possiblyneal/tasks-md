@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 func run(t *testing.T, args ...string) (code int, stdout, stderr string) {
@@ -176,6 +177,112 @@ func TestListJSONIsWhatAnAgentReads(t *testing.T) {
 	}
 }
 
+// A sort orders siblings and never flattens the tree, so a Subtask still sits
+// under its parent; and every Task carries its rank across every Repo, which
+// is the order a lane spanning several files is drawn in.
+func TestListSorts(t *testing.T) {
+	home(t, map[string]string{"house-move": `# Tasks
+
+- [ ] Pack the kitchen | doing
+  - id: m3qa
+  - created: 2026-09-20
+  - [ ] Wrap glassware | doing
+    - id: m3qc
+    - created: 2026-09-20
+    - deadline: 2026-10-09
+  - [ ] Label boxes | backlog
+    - id: m3qd
+    - created: 2026-09-20
+    - deadline: 2026-10-02
+- [ ] Book the van | backlog
+  - id: v9t1
+  - created: 2026-09-21
+  - priority: high
+  - estimate: S
+`, "work": `# Tasks
+
+- [ ] Write the report | inbox
+  - id: r3pt
+  - created: 2026-09-22
+  - deadline: 2026-10-05
+  - priority: low
+  - estimate: L
+`})
+	order := func(args ...string) string {
+		t.Helper()
+		code, out, errs := run(t, append([]string{"list"}, args...)...)
+		if code != 0 {
+			t.Fatalf("exited %d: %s", code, errs)
+		}
+		var ids []string
+		for _, line := range strings.Split(out, "\n") {
+			if fields := strings.Fields(line); len(fields) > 1 && len(fields[0]) == 4 && !strings.Contains(line, "/") {
+				ids = append(ids, fields[0])
+			}
+		}
+		return strings.Join(ids, " ")
+	}
+	cases := map[string]string{
+		"":         "m3qa m3qc m3qd v9t1 r3pt",
+		"file":     "m3qa m3qc m3qd v9t1 r3pt",
+		"title":    "v9t1 m3qa m3qd m3qc r3pt",
+		"deadline": "m3qa m3qd m3qc v9t1 r3pt",
+		"priority": "v9t1 m3qa m3qc m3qd r3pt",
+		"estimate": "v9t1 m3qa m3qc m3qd r3pt",
+		"created":  "m3qa m3qc m3qd v9t1 r3pt",
+	}
+	for sort, want := range cases {
+		args := []string{}
+		if sort != "" {
+			args = []string{"-sort", sort}
+		}
+		if got := order(args...); got != want {
+			t.Errorf("-sort %q = %s, want %s", sort, got, want)
+		}
+	}
+
+	code, out, errs := run(t, "list", "-json", "-sort", "deadline")
+	if code != 0 {
+		t.Fatalf("exited %d: %s", code, errs)
+	}
+	var body struct {
+		Repos []struct {
+			Tasks []struct {
+				ID   string `json:"id"`
+				Rank int    `json:"rank"`
+			} `json:"tasks"`
+		} `json:"repos"`
+		Sorts []string `json:"sorts"`
+		Today string   `json:"today"`
+	}
+	if err := json.Unmarshal([]byte(out), &body); err != nil {
+		t.Fatalf("decode: %v\n%s", err, out)
+	}
+	ranks := map[string]int{}
+	for _, r := range body.Repos {
+		for _, task := range r.Tasks {
+			ranks[task.ID] = task.Rank
+		}
+	}
+	// By deadline across both files, the ones with none after the rest.
+	want := map[string]int{"m3qd": 0, "r3pt": 1, "m3qc": 2, "m3qa": 3, "v9t1": 4}
+	for id, rank := range want {
+		if ranks[id] != rank {
+			t.Errorf("rank of %s = %d, want %d (%v)", id, ranks[id], rank, ranks)
+		}
+	}
+	if strings.Join(body.Sorts, " ") != "file title deadline created priority estimate" {
+		t.Errorf("sorts = %v", body.Sorts)
+	}
+	if body.Today != time.Now().Format(time.DateOnly) {
+		t.Errorf("today = %q, want the host's local date", body.Today)
+	}
+
+	if code, _, errs := run(t, "list", "-sort", "colour"); code != 2 || !strings.Contains(errs, "colour") {
+		t.Errorf("an unknown sort exited %d (%s), want 2 naming it", code, errs)
+	}
+}
+
 func TestListRefusesWhatItCannotAnswer(t *testing.T) {
 	home(t, map[string]string{"work": work})
 	if code, _, errs := run(t, "list", "-repo", "nowhere"); code != 1 || !strings.Contains(errs, "nowhere") {
@@ -238,14 +345,15 @@ func TestOneNameUnderTwoRootsIsAConfigError(t *testing.T) {
 	}
 }
 
+// The conflict markers are spliced in so the file itself never holds one at the
+// start of a line, which the merge-conflict hook would take for a real one.
 const broken = `# Tasks
 
-<<<<<<< HEAD
+` + "<<<<<<< HEAD" + `
 - [ ] Mine | inbox
   - id: aaaa
   - created: 2026-09-20
-=======
->>>>>>> origin/tasks
+` + "=======\n>>>>>>> origin/tasks" + `
 - [ ] Twice | inbox
   - id: aaaa
   - created: 2026-09-20

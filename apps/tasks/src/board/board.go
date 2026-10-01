@@ -6,11 +6,13 @@
 package board
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/possiblyneal/tasks-md/apps/tasks/src/history"
 	"github.com/possiblyneal/tasks-md/apps/tasks/src/repos"
@@ -26,16 +28,64 @@ type Narrowing struct {
 	Tags      []string
 	Search    string
 	Unblocked bool // leave Blocked Tasks out
+	Sort      Sort // empty is file order
 }
 
-// Check refuses a Narrowing naming a State there is not.
+// Check refuses a Narrowing naming a State or a Sort there is not.
 func (n Narrowing) Check() error {
 	for _, s := range n.States {
 		if !slices.Contains(taskfile.States, s) {
 			return fmt.Errorf("%q is not a State: want one of %v", s, taskfile.States)
 		}
 	}
+	if n.Sort != "" && !slices.Contains(Sorts, n.Sort) {
+		return fmt.Errorf("%q is not a sort: want one of %v", n.Sort, Sorts)
+	}
 	return nil
+}
+
+// Sort is an order a read comes back in. Within a Repo it orders siblings and
+// never flattens the tree, so a Subtask still sits under its parent; across
+// Repos it is each Task's Rank.
+type Sort string
+
+const (
+	SortFile     Sort = "file"
+	SortTitle    Sort = "title"
+	SortDeadline Sort = "deadline"
+	SortCreated  Sort = "created"
+	SortPriority Sort = "priority"
+	SortEstimate Sort = "estimate"
+)
+
+// Sorts is every Sort there is, in the order a surface offers them. The flag
+// help, the refusal of an unknown one and the sorts a read serves all come
+// from it, so no surface keeps a copy that could offer one this would refuse.
+var Sorts = []Sort{SortFile, SortTitle, SortDeadline, SortCreated, SortPriority, SortEstimate}
+
+// ranked is the order each level's words sort in. A word not listed, and a
+// Task without the attribute, sorts after every one that has it.
+var ranked = map[Sort]map[string]string{
+	SortPriority: {"high": "0", "med": "1", "medium": "1", "low": "2"},
+	SortEstimate: {"s": "0", "small": "0", "m": "1", "medium": "1", "l": "2", "large": "2"},
+}
+
+// key is what the Sort compares a Task by: two keys in string order are the
+// two Tasks in the Sort's order. File order is one key for every Task, so a
+// stable sort leaves them where they were.
+func (s Sort) key(title, created string, attr func(string) string) string {
+	const missing = "~" // after every digit and letter a key holds
+	switch s {
+	case SortTitle:
+		return strings.ToLower(title)
+	case SortCreated:
+		return cmp.Or(created, missing)
+	case SortDeadline:
+		return cmp.Or(attr("deadline"), missing)
+	case SortPriority, SortEstimate:
+		return cmp.Or(ranked[s][strings.ToLower(attr(string(s)))], missing)
+	}
+	return ""
 }
 
 // Task is one Task as a read gives it: flat, in file order, carrying where it
@@ -55,6 +105,19 @@ type Task struct {
 	Parents []string `json:"parents"`
 	Leaf    bool     `json:"leaf"`
 	Blocked bool     `json:"blocked"`
+	// Rank is this Task's place in the whole read's order, counted from 0
+	// across every Repo: by the Sort, then Repo, then place in the file. A
+	// surface drawing Tasks from several Repos together orders them by it.
+	Rank int `json:"rank"`
+}
+
+func (t Task) attr(label string) string {
+	for _, a := range t.Attrs {
+		if a.Label == label {
+			return a.Value
+		}
+	}
+	return ""
 }
 
 // Repo is one Repo's read. Problems is the file's lint, by line: a Repo with
@@ -71,20 +134,27 @@ type Repo struct {
 }
 
 // Board is a whole read as `tasks list -json` prints it and GET /api/state
-// answers it: every Repo read, and the config errors met finding them.
+// answers it: every Repo read, the config errors met finding them, the sorts
+// a read can be ordered by, and the host's local date, which is the day a
+// Deadline is today or Overdue against.
 type Board struct {
 	Repos  []Repo   `json:"repos"`
 	Errors []string `json:"errors"`
+	Sorts  []Sort   `json:"sorts"`
+	Today  string   `json:"today"`
 }
 
-// Errors is errs as the sentences a Board carries, never null.
-func Errors(errs []error) []string {
-	out := make([]string, len(errs))
+// Of is the Board holding a read, with errs as its sentences, never null.
+func Of(read []Repo, errs []error) Board {
+	sentences := make([]string, len(errs))
 	for i, err := range errs {
-		out[i] = err.Error()
+		sentences[i] = err.Error()
 	}
-	return out
+	return Board{Repos: read, Errors: sentences, Sorts: Sorts, Today: Today()}
 }
+
+// Today is the host's local date, written the way a Deadline is.
+func Today() string { return time.Now().Format(time.DateOnly) }
 
 // NoRepo is a Narrowing naming a Repo that is not there.
 type NoRepo string
@@ -129,7 +199,7 @@ func Read(found []repos.Repo, n Narrowing) ([]Repo, error) {
 	}
 	out := make([]Repo, 0, len(found))
 	for _, r := range found {
-		read := ReadRepo(r)
+		read := readRepo(r, n.Sort)
 		kept := read.Tasks[:0]
 		for _, t := range read.Tasks {
 			if n.keeps(t) {
@@ -138,6 +208,18 @@ func Read(found []repos.Repo, n Narrowing) ([]Repo, error) {
 		}
 		read.Tasks = kept
 		out = append(out, read)
+	}
+	var all []*Task
+	for i := range out {
+		for j := range out[i].Tasks {
+			all = append(all, &out[i].Tasks[j])
+		}
+	}
+	slices.SortStableFunc(all, func(a, b *Task) int {
+		return strings.Compare(n.Sort.key(a.Title, a.Created, a.attr), n.Sort.key(b.Title, b.Created, b.attr))
+	})
+	for rank, t := range all {
+		t.Rank = rank
 	}
 	return out, nil
 }
@@ -154,10 +236,12 @@ func Only(found []repos.Repo, name string) ([]repos.Repo, error) {
 	return found[i : i+1], nil
 }
 
-// ReadRepo reads one Repo's file, whole. A file that cannot be read is a
-// problem on line 0 rather than an error, so one broken Repo never hides the
-// rest.
-func ReadRepo(r repos.Repo) Repo {
+// ReadRepo reads one Repo's file, whole and in file order. A file that cannot
+// be read is a problem on line 0 rather than an error, so one broken Repo
+// never hides the rest.
+func ReadRepo(r repos.Repo) Repo { return readRepo(r, SortFile) }
+
+func readRepo(r repos.Repo, sort Sort) Repo {
 	out := Repo{Name: r.Name, Path: r.Path, Tasks: []Task{}, Problems: []taskfile.Problem{}, Flags: history.Flags(r.Path)}
 	text, err := os.ReadFile(r.File())
 	if err != nil {
@@ -182,6 +266,10 @@ func ReadRepo(r repos.Repo) Repo {
 
 	var flatten func(ts []*taskfile.Task, parent string, parents []string)
 	flatten = func(ts []*taskfile.Task, parent string, parents []string) {
+		ts = slices.Clone(ts)
+		slices.SortStableFunc(ts, func(a, b *taskfile.Task) int {
+			return strings.Compare(sort.key(a.Title, a.Created, a.Attr), sort.key(b.Title, b.Created, b.Attr))
+		})
 		for _, t := range ts {
 			out.Tasks = append(out.Tasks, Task{
 				ID:          t.ID,

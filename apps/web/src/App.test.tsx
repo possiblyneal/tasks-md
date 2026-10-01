@@ -2,9 +2,9 @@
 
 // The board: six State lanes of leaf-Task cards over every Repo, drawn from
 // what `GET /api/state` answered and nothing else. A parent is not a card of
-// its own; its title rides on each leaf under it. The one write on the board
-// is a move: a card dragged to a lane at a desk, or held on a phone and sent
-// through Move to.
+// its own; its title rides on each leaf under it. Tapping a card opens it to
+// read. The one write on the board is a move: a card dragged to a lane at a
+// desk, or held on a phone and sent through Move to.
 
 import {
   cleanup,
@@ -17,104 +17,10 @@ import {
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 import { App } from './App'
-import type { Board, Task } from './state'
-
-function task(fields: Partial<Task> & Pick<Task, 'title' | 'state'>): Task {
-  return {
-    id: '',
-    tags: [],
-    created: '2026-09-20',
-    attrs: [],
-    description: '',
-    line: 1,
-    depth: 0,
-    parent: '',
-    parents: [],
-    leaf: true,
-    blocked: false,
-    ...fields,
-  }
-}
-
-const BOARD: Board = {
-  repos: [
-    {
-      name: 'house-move',
-      path: '/home/n/code/house-move',
-      color: 'green',
-      problems: [],
-      flags: [],
-      tasks: [
-        task({
-          id: 'm3qa',
-          title: 'Pack the kitchen',
-          state: 'doing',
-          leaf: false,
-          line: 4,
-        }),
-        task({
-          id: 'm3qc',
-          title: 'Wrap glassware',
-          state: 'doing',
-          tags: ['fragile'],
-          attrs: [{ label: 'deadline', value: '2026-10-10' }],
-          depth: 1,
-          parent: 'm3qa',
-          parents: ['Pack the kitchen'],
-          line: 8,
-        }),
-        task({
-          id: 'm3qb',
-          title: 'Buy boxes',
-          state: 'done',
-          depth: 1,
-          parent: 'm3qa',
-          parents: ['Pack the kitchen'],
-          line: 11,
-        }),
-        task({
-          id: 'v9t1',
-          title: 'Book the van',
-          state: 'backlog',
-          blocked: true,
-          line: 14,
-        }),
-      ],
-    },
-    {
-      name: 'work',
-      path: '/home/n/code/work',
-      color: '',
-      problems: [{ line: 3, message: '"Write the report" has no id line' }],
-      flags: ['not backed up'],
-      tasks: [task({ title: 'Write the report', state: 'inbox', line: 3 })],
-    },
-  ],
-  errors: [],
-}
-
-// Every request the board made, so what it asked for and how is checkable.
-let asked: { url: string; init?: RequestInit }[] = []
-
-function answering(...bodies: (Board | { status: number; error: string })[]) {
-  return (url: string, init?: RequestInit) => {
-    asked.push({ url, init })
-    const body = bodies[Math.min(asked.length, bodies.length) - 1]
-    if (body && 'status' in body) {
-      return Promise.resolve(
-        new Response(JSON.stringify({ error: body.error }), {
-          status: body.status,
-        }),
-      )
-    }
-    return Promise.resolve(
-      new Response(JSON.stringify(body), { headers: { ETag: '"1"' } }),
-    )
-  }
-}
+import { answering, asked, BOARD, task } from './testing'
 
 beforeEach(() => {
-  asked = []
+  asked.length = 0
   vi.stubGlobal('fetch', answering(BOARD))
 })
 
@@ -178,13 +84,100 @@ test('until a card is moved, the board only reads', async () => {
   render(<App />)
   await screen.findByText('Wrap glassware')
 
-  expect(screen.queryAllByRole('button')).toEqual([])
-  expect(screen.queryAllByRole('textbox')).toEqual([])
   expect(screen.queryAllByRole('checkbox')).toEqual([])
   for (const { url, init } of asked) {
-    expect(url).toBe('/api/state')
+    expect(url).toMatch(/^\/api\/state(\?|$)/)
     expect(init?.method ?? 'GET').toBe('GET')
   }
+})
+
+test('each lane says how many cards it holds', async () => {
+  render(<App />)
+  await screen.findByText('Wrap glassware')
+
+  expect(within(lane('Doing')).getByRole('heading').textContent).toBe('Doing 1')
+  expect(within(lane('Deferred')).getByRole('heading').textContent).toBe(
+    'Deferred 0',
+  )
+})
+
+// Rank is the read's order across every Repo, so a lane holding two Repos'
+// cards draws them in the order `tasks list -sort` would print them.
+test('a lane draws its cards in the order the read ranked them', async () => {
+  const [house, work] = BOARD.repos
+  if (!house || !work) throw new Error('BOARD has two Repos')
+  vi.stubGlobal(
+    'fetch',
+    answering({
+      ...BOARD,
+      repos: [
+        {
+          ...house,
+          tasks: [task({ title: 'Label boxes', state: 'inbox', rank: 1 })],
+        },
+        {
+          ...work,
+          tasks: [task({ title: 'File expenses', state: 'inbox', rank: 0 })],
+        },
+      ],
+    }),
+  )
+  render(<App />)
+  await screen.findByText('Label boxes')
+
+  expect(
+    within(lane('Inbox'))
+      .getAllByRole('article')
+      .map((card) => card.querySelector('.card-title')?.textContent),
+  ).toEqual(['File expenses', 'Label boxes'])
+})
+
+// Today is the host's, served with the read, so a phone in another time zone
+// marks the same Deadlines the host would.
+test('a Deadline today or past is marked against the served today', async () => {
+  const [house, work] = BOARD.repos
+  if (!house || !work) throw new Error('BOARD has two Repos')
+  const due = (value: string) => [{ label: 'deadline', value }]
+  vi.stubGlobal(
+    'fetch',
+    answering({
+      ...BOARD,
+      today: '2026-10-01',
+      repos: [
+        {
+          ...house,
+          tasks: [
+            task({
+              title: 'Return keys',
+              state: 'doing',
+              attrs: due('2026-10-01'),
+            }),
+            task({
+              title: 'Cancel internet',
+              state: 'doing',
+              attrs: due('2026-09-28'),
+            }),
+            task({
+              title: 'Sell sofa',
+              state: 'doing',
+              attrs: due('2026-10-02'),
+            }),
+          ],
+        },
+        work,
+      ],
+    }),
+  )
+  render(<App />)
+  await screen.findByText('Return keys')
+
+  const card = (title: string) =>
+    within(screen.getByText(title).closest('article') as HTMLElement)
+  expect(card('Return keys').getByText('due today').className).toBe('today')
+  expect(
+    card('Cancel internet').getByText('overdue 2026-09-28').className,
+  ).toBe('overdue')
+  expect(card('Sell sofa').getByText('due 2026-10-02').className).toBe('')
 })
 
 test('a Repo whose tasks history is flagged says so', async () => {

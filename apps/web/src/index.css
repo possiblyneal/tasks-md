@@ -3,10 +3,37 @@
   color-scheme: light dark;
   font-family: system-ui, sans-serif;
   font-size: 16px;
+
+  /* The colors, as tokens, so light and dark are one block each and follow
+     the OS. */
+  --bg: #f6f5f3;
+  --fg: #1c1b1a;
+  --surface: #ffffff;
+  --line: color-mix(in srgb, var(--fg) 15%, transparent);
+  --accent: #2659c9;
+  --on-accent: #ffffff;
+  --danger: #b42318;
+  --warn: #a15c00;
+  --scrim: rgb(0 0 0 / 40%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #151515;
+    --fg: #e8e6e3;
+    --surface: #222221;
+    --accent: #7aa7ff;
+    --on-accent: #10131a;
+    --danger: #ff8a7a;
+    --warn: #f2b84b;
+    --scrim: rgb(0 0 0 / 60%);
+  }
 }
 
 body {
   margin: 0;
+  background: var(--bg);
+  color: var(--fg);
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
     env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
@@ -188,8 +215,9 @@ body {
   overflow-wrap: anywhere;
 }
 
-/* The board: six State lanes side by side, scrolled across with one thumb and
-   snapping to a lane, so a phone shows one lane and most of the next. */
+/* The board: six State lanes side by side. On a phone each is most of a
+   screen wide, scrolled across with one thumb and snapping to a lane, with the
+   next one's edge in view; at a desk all six fit across. */
 .board {
   padding: 0.5rem 0;
 }
@@ -221,7 +249,8 @@ body {
 }
 
 .lane {
-  flex: 0 0 min(85vw, 18rem);
+  flex: 0 0 86vw;
+  min-width: 0;
   scroll-snap-align: start;
   display: flex;
   flex-direction: column;
@@ -237,8 +266,22 @@ body {
   opacity: 0.6;
 }
 
-/* A card's edge is its Repo's Color, so two Repos on one lane tell apart. */
+@media (min-width: 64rem) {
+  .lanes {
+    overflow-x: visible;
+    scroll-snap-type: none;
+  }
+
+  .lane {
+    flex: 1 1 0;
+  }
+}
+
+/* A card's edge is its Repo's Color, so two Repos on one lane tell apart. The
+   whole card opens it: the title's button is stretched over it. */
 .card {
+  position: relative;
+  background: var(--surface);
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
@@ -263,12 +306,181 @@ body {
   overflow-wrap: anywhere;
 }
 
+button.card-title {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+}
+
+button.card-title::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
 .repo {
   font-weight: 600;
 }
 
 .blocked {
-  color: #c0392b;
+  color: var(--danger);
+}
+
+/* A Deadline on the day, and one past it, against the host's today. */
+.today {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.overdue {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* Said to a screen reader and not drawn. */
+.unseen {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The narrowing controls, above the lanes where a thumb reaches them. The chip
+   rows scroll across rather than wrap, so they never push the lanes down. */
+.narrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0 1rem 0.75rem;
+}
+
+.control {
+  min-height: 44px;
+  padding: 0 0.75rem;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.narrow input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.chips {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.chip {
+  flex: none;
+  min-height: 44px;
+  padding: 0 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+}
+
+.chip[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.flag {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.chip[aria-pressed='true'] .flag {
+  color: inherit;
+}
+
+/* The panel: a bottom sheet most of a phone's height, and a side panel at a
+   desk, over a scrim that closes it when tapped. */
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+}
+
+.panel {
+  position: fixed;
+  inset: auto 0 0;
+  height: 88dvh;
+  overflow-y: auto;
+  padding: 0 1rem calc(1rem + env(safe-area-inset-bottom));
+  border-radius: 1rem 1rem 0 0;
+  background: var(--surface);
+  box-sizing: border-box;
+}
+
+@media (min-width: 64rem) {
+  .panel {
+    inset: 0 0 0 auto;
+    width: 28rem;
+    height: auto;
+    border-radius: 0;
+  }
+}
+
+.panel-bar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 0.5rem;
+  background: var(--surface);
+}
+
+/* A parent above the title, or a Subtask below it: a Task to open next. */
+.parent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+}
+
+.parent-title {
+  overflow-wrap: anywhere;
+}
+
+.attrs {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0.5rem 0;
+}
+
+.attrs dt {
+  opacity: 0.7;
+}
+
+.attrs dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.said {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* Move to: the six States in a sheet from the bottom, within a thumb's reach. */
