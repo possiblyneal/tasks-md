@@ -8,12 +8,12 @@ static files that same process serves beside the JSON, so there is no second
 process and no CORS. `docs/adrs/0003-replace-the-tui-with-a-browser-client.md`
 records why the surface moved off the terminal.
 
-What it holds today (#119, #120, #121): the board, six State lanes of
-leaf-Task cards over every Repo, drawn from `GET /api/state`, with Repo and Tag
-chips, a search box, a sort picker, a read-only panel a card opens into, and a
-move, by dragging a card to a lane at a desk or holding it on a phone for Move
-to. The box, the add sheet and the breakdown are kept unmounted for #123, which
-brings the Broker routes back; the other writes come with #122.
+What it holds today: the board, six State lanes of leaf-Task cards over every
+Repo, drawn from `GET /api/state`, with Repo and Tag chips, a search box, a
+sort picker, a panel a card opens into, a move, by dragging a card to a lane at
+a desk or holding it on a phone for Move to, and the add/edit form with
+delete. The box and the breakdown are kept unmounted for #123, which brings
+the Broker routes back.
 
 ## Ownership
 
@@ -22,29 +22,30 @@ brings the Broker routes back; the other writes come with #122.
 - `src/state.ts` — the wire shapes and the one read the board makes. It mirrors
   `apps/tasks/src/board/board.go`, which is the side that decides them. It
   holds the Narrowing and `queryString`, the one function that writes it as a
-  query, plus the types the unmounted sheet still reads (`Offered`,
-  `Collection`, `Level`) and `GET /api/files`'s shapes.
-- `src/write.ts` — `moveTask`, the one write the board makes, and the calls
-  the sheet, the box and the breakdown make. No route answers those until #122
-  and #123; they stay so those components keep compiling and their tests keep
-  their grammar.
+  query, the values the form offers (`LEVELS`, `ESTIMATES`, `COLORS`,
+  mirroring `write.go`) and `GET /api/files`'s shapes.
+- `src/write.ts` — the `Draft` the form holds, `draftOf`, and the board's
+  writes: `moveTask`, `addTask`, `editTask`, `deleteTask`. `capture`, `ask`,
+  `addSubtask` and `breakdown` are the box's and the breakdown's; no route
+  answers those until #123.
 - `src/hold.ts` — `useHold`, a long press on touch: the timer, the buzz, and
   the click after it stopped at the element.
 - `src/MoveTo.tsx` — Move to, the bottom sheet of six States a held card opens.
 - `src/read.ts` — the guard around a read a screen makes for itself, used by the
-  sheet's file picker.
+  form's file picker.
 - `src/App.tsx` — the board: the six lanes, the cards, the moves, the
   problems and flags a Repo has, and which panel is open. It is what
   `main.tsx` mounts.
 - `src/poll.ts` — `usePoll`, the once-a-second read of `GET /api/state` under
   one Narrowing.
 - `src/Narrow.tsx` — the Repo chips, Tag chips, search box and sort picker.
-- `src/Panel.tsx` — the read-only panel: every attribute, the parent with its
-  leaf counts per State, and the Subtasks.
+- `src/Panel.tsx` — the panel: every attribute, the parent with its leaf
+  counts per State, the Subtasks, and Edit and Delete.
+- `src/Sheet.tsx` — the add/edit form, and the file picker for attachments.
 - `src/Due.tsx` — a Deadline marked today or Overdue against the served
   `today`.
-- `src/Box.tsx`, `src/Sheet.tsx`, `src/Breakdown.tsx` — the dump box, the add
-  sheet and the breakdown, unmounted until #123.
+- `src/Box.tsx`, `src/Breakdown.tsx` — the dump box and the breakdown,
+  unmounted until #123.
 - `src/main.tsx` — the mount, and nothing else.
 - `src/App.test.tsx`, `src/Narrow.test.tsx`, `src/Panel.test.tsx`,
   `src/Box.test.tsx`, `src/Sheet.test.tsx`, `src/Breakdown.test.tsx` — the
@@ -87,12 +88,28 @@ brings the Broker routes back; the other writes come with #122.
   drawn only under the narrowing it answered.
 - **Today is the host's.** The read's `today` is what a Deadline is due today
   or Overdue against, never the browser's clock.
-- **A card opens a read-only panel.** A bottom sheet 88% of a phone's height,
+- **A card opens a panel.** A bottom sheet 88% of a phone's height,
   a side panel at a desk. It shows every attribute; a Subtask's opens on its
   parent, with the parent's State and its leaves per State
   (`Doing 1 · Backlog 2 · Done 3`), and the parent opens its own panel. The
   tree is read from the wide read in file order. A card without an id is not
-  opened.
+  opened. Edit opens the form on the Task; Delete asks with a second tap
+  rather than a browser dialog, deletes the Task and its Subtasks, and closes
+  the panel.
+- **One form adds and edits.** Add on the board opens it on a blank Task in
+  the first Repo; Edit opens it on the Task, in the same scrim and panel.
+  It carries Title, Description, Why, Acceptance, Tags, Deadline, Estimate
+  S/M/L, Priority, Impact, Color, Blocked by and Attachments; Reason only
+  while the State is Deferred or Declined, Until only while Deferred. An add
+  picks the Repo and State; an edit shows both and changes neither, since a
+  move holds State's rules. A value the form does not offer is kept as one
+  more option. Nothing is written before submit, and a refusal is drawn in
+  the form with every value still in its field.
+- **An edit sends what changed and the version it read.** `editTask` diffs
+  the Draft the form opened on against the one submitted, so an attribute the
+  form hides or nobody touched is not rewritten; attachments go as `attach`
+  and `detach`. A delete sends the version too, and a tree changed since is a
+  `409` drawn in the API's words.
 - **The address names the open panel.** `?task=<id>&repo=<name>` opens one on
   load, since an id is unique only within its Repo; with no `repo` the first
   Repo holding the id is used. Opening and closing replace the address.
@@ -101,7 +118,7 @@ brings the Broker routes back; the other writes come with #122.
 - **A Repo whose file has problems is flagged, line by line.** The problems
   `tasks lint` reports arrive on the read and are drawn above the lanes, and
   the Repo's chip is marked; config errors are drawn the same way.
-- **A move is the board's one write.** At a desk (`pointer: fine`) a card is
+- **A move is a drag or a hold.** At a desk (`pointer: fine`) a card is
   draggable and a lane is a drop target. On touch a hold of `HOLD_MS` (450ms)
   buzzes where `navigator.vibrate` exists, suppresses the browser's menu and
   opens Move to, listing the six States with the card's own disabled; the
@@ -140,7 +157,7 @@ up` or why it refuses writes, as the read carries them in `flags`.
 - No `public/`: `scripts/structure` reads a folder under a unit that is neither
   `src/` nor a scoped folder as a domain and requires a `src/` inside it.
 - The screens #119 deleted (Series, collections, activity, the log) are in
-  git history for #122 to recover from.
+  git history.
 
 ## Verification
 

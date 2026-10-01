@@ -48,6 +48,11 @@ export type Task = {
   leaf: boolean
   blocked: boolean
   /**
+   * Its top-level tree's version. An edit or a delete hands it back, and the
+   * API refuses the write when the tree has changed since it was read.
+   */
+  version: string
+  /**
    * This Task's place in the whole read's order, across every Repo: by the
    * sort asked for, then Repo, then place in the file. A lane holds several
    * Repos' cards and draws them by it.
@@ -169,43 +174,30 @@ export async function fetchState(
   }
 }
 
-// What the sheet, which nothing mounts until #123, picks from. No route serves
-// these now; the sheet is kept so that work starts from it.
+// The values the form offers, mirroring `apps/tasks/src/write/write.go`,
+// which refuses any other.
 
-export type Collection = {
-  id: string
-  name: string
-  color: string
-  count: number
-}
+/** Priority and Impact. */
+export const LEVELS = ['low', 'med', 'high']
 
-/** Everything the sheet offers to pick from. */
-export type Offered = {
-  lists: Collection[]
-  tags: Collection[]
-  sorts: string[]
-  colors: string[]
-  snoozes: string[]
-  priorities: Level[]
-  impacts: Level[]
-}
+/** An Estimate, each with the letter the form shows it under. */
+export const ESTIMATES = [
+  { value: 'small', label: 'S' },
+  { value: 'medium', label: 'M' },
+  { value: 'large', label: 'L' },
+]
 
-/** One of the three levels, and what choosing it means. */
-export type Level = {
-  name: string
-  example: string
-}
-
-/** Nothing on offer. */
-export const OFFERED_NOTHING: Offered = {
-  lists: [],
-  tags: [],
-  sorts: [],
-  colors: [],
-  snoozes: [],
-  priorities: [],
-  impacts: [],
-}
+export const COLORS = [
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'cyan',
+  'blue',
+  'violet',
+  'magenta',
+  'brown',
+]
 
 /**
  * One directory on the machine `tasks api` runs on, as `GET /api/files` lists

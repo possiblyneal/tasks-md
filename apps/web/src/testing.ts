@@ -20,6 +20,7 @@ export function task(
     leaf: true,
     blocked: false,
     rank: 0,
+    version: 'v0',
     ...fields,
   }
 }

@@ -15,8 +15,8 @@
 import { useState } from 'react'
 
 import { Sheet } from './Sheet'
-import type { Narrowing, Offered } from './state'
-import { addSubtask, addTask, ask, capture, type TaskBody } from './write'
+import type { Narrowing } from './state'
+import { addSubtask, addTask, ask, blank, capture, type Draft } from './write'
 
 /**
  * Which box this is, and the two are alternatives rather than two switches
@@ -32,18 +32,18 @@ type Where =
   | { parent: string; narrowing?: never }
 
 export function Box({
-  offered,
+  repos,
   narrowing,
   parent,
 }: {
-  /** What the add sheet picks from. Nothing here is read on the way past. */
-  offered: Offered
+  /** The Repos the add sheet offers, the first picked until another is. */
+  repos: string[]
 } & Where) {
   const [text, setText] = useState('')
   const [working, setWorking] = useState<'' | 'reading' | 'asking'>('')
   const [error, setError] = useState<string | null>(null)
   const [answer, setAnswer] = useState<string | null>(null)
-  const [draft, setDraft] = useState<TaskBody | null>(null)
+  const [draft, setDraft] = useState<Draft | null>(null)
 
   // The Broker holds nothing between calls, so each of these is one turn and
   // the whole of it. Both take minutes at worst, which is why the box says
@@ -74,15 +74,7 @@ export function Box({
     return (
       <Sheet
         draft={draft}
-        // Adding is a create, and `POST /api/tasks` files the Task under the
-        // Lists and Tags it is handed rather than a change to them. The Broker
-        // fills both in, so they are the draft as well as what is ticked: left
-        // as the baseline they would cancel out and the dump would land filed
-        // under nothing.
-        against={{}}
-        offered={offered}
-        // A Task being written now is hidden from nothing, so the sheet does
-        // not offer to snooze it.
+        repos={repos}
         existing={false}
         action="Add"
         // The dump is done with once the Task is written. Backing out of the
@@ -116,7 +108,9 @@ export function Box({
         <button
           type="button"
           onClick={() =>
-            void hand('reading', async (said) => setDraft(await capture(said)))
+            void hand('reading', async (said) =>
+              setDraft({ ...blank(repos[0] ?? ''), ...(await capture(said)) }),
+            )
           }
           disabled={working !== '' || text.trim() === ''}
         >

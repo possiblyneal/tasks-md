@@ -437,6 +437,7 @@ button.card-title::after {
   top: 0;
   display: flex;
   justify-content: flex-end;
+  gap: 0.5rem;
   padding-top: 0.5rem;
   background: var(--surface);
 }

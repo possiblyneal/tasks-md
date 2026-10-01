@@ -1,107 +1,94 @@
-// The sheet: a Task open for correction, whether it is one the Broker just read
-// or one that already exists. Nothing about the Task is written before submit,
-// so a dump handed over and then thought better of leaves nothing behind.
-//
-// It makes one write of its own, which is the List or Tag its ticks offer to
-// make: a Collection is an aggregate of its own rather than part of the Task,
-// so making one is not the gate giving way. Every other write is whoever opens
-// the sheet saying what submitting it does, which is what lets one sheet be the
-// add form, the edit form and the subtask form without holding three
-// descriptions of the same ten attributes.
+// The form: a Task to add, or one open to edit. A bottom sheet on a phone and a
+// side panel at a desk, as the panel is. Nothing is written before submit, and
+// whoever opens it says what submitting does, which is what lets one form be
+// the add form, the edit form and the sheet a dump opens filled in.
 
 import { useState } from 'react'
 
 import { sentence } from './api'
-import { type Collection, fetchFiles, type Files, type Offered } from './state'
+import {
+  COLORS,
+  ESTIMATES,
+  fetchFiles,
+  type Files,
+  LEVELS,
+  named,
+  STATES,
+} from './state'
 import { useRead } from './read'
-import { addCollection, type Kind, memberships, type TaskBody } from './write'
+import type { Draft } from './write'
 
-/** The attributes this sheet takes as text, which is every one it shows. */
-type Said = 'title' | 'description' | 'why' | 'deadline' | 'estimate'
+/** The attributes this form takes as typed text. */
+type Said =
+  | 'title'
+  | 'description'
+  | 'why'
+  | 'acceptance'
+  | 'deadline'
+  | 'priority'
+  | 'impact'
+  | 'estimate'
+  | 'color'
+  | 'reason'
+  | 'until'
 
 export function Sheet({
   draft,
-  against,
-  offered,
+  repos,
   existing,
   action,
   onSubmit,
   onCancel,
 }: {
-  draft: TaskBody
+  draft: Draft
+  /** The Repos a new Task can be written to. An edit's Repo is fixed. */
+  repos: string[]
   /**
-   * What submitting this is a change against, where that is not the draft it
-   * opened on. An edit is a change against the Task, which is the default. A
-   * create takes the memberships whole, so a create prefilled from a Task
-   * passes `{}` here: leaving the draft as the baseline would send an empty
-   * difference and write a Task belonging to no List the sheet drew ticked.
-   */
-  against?: TaskBody
-  /**
-   * The Lists and Tags to file the Task under, the colors it may carry and the
-   * snoozes on offer, as `GET /api/state` answered them. The client keeps no
-   * list of any of them, so it cannot offer a value the store would refuse.
-   * The sorts travel in the same type and are the controls' rather than this
-   * form's.
-   */
-  offered: Offered
-  /**
-   * Whether the Task this sheet is open on already exists. Only the snooze
-   * reads it: what it takes is a span to hide a Task for, and a Task nobody
-   * has written yet is hidden from nothing, so the control is on an edit and
-   * not on a create. Every other attribute means the same thing either way.
+   * Whether the Task already exists. An edit keeps its Repo and its State,
+   * since a Task changes State by a move, which holds the rules for it.
    */
   existing: boolean
   /** The word on the button, which is what submitting it does. */
   action: string
-  onSubmit: (body: TaskBody) => Promise<void>
+  onSubmit: (draft: Draft) => Promise<void>
   onCancel: () => void
 }) {
-  const [body, setBody] = useState<TaskBody>(draft)
-  // What the Task carried when this opened, kept rather than read again. The
-  // draft prop is recomputed from every poll, so a membership another Actor
-  // changed while the sheet was open would move the baseline under it and an
-  // untick would come out as no change at all.
-  const [opened] = useState<TaskBody>(against ?? draft)
+  const [body, setBody] = useState<Draft>(draft)
+  // Tags and Blocked by are typed as text and read into sets on submit, so a
+  // half-typed word is not split under the cursor.
+  const [tags, setTags] = useState(draft.tags.map((t) => `#${t}`).join(' '))
+  const [blockers, setBlockers] = useState(draft.blockedBy.join(', '))
   const [error, setError] = useState<string | null>(null)
   const [writing, setWriting] = useState(false)
 
   const say = (name: Said, value: string) =>
     setBody((was) => ({ ...was, [name]: value }))
 
-  const toggle = (name: 'intoLists' | 'addTags', id: string) =>
-    setBody((was) => {
-      const on = was[name] ?? []
-      return {
-        ...was,
-        [name]: on.includes(id)
-          ? on.filter((other) => other !== id)
-          : [...on, id],
-      }
-    })
+  const deferred = body.state === 'deferred'
+  const reasoned = deferred || body.state === 'declined'
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     setWriting(true)
     setError(null)
     try {
-      // The memberships are the difference between what the Task carried when
-      // this opened and what is ticked now, because ticking and unticking are
-      // different fields on the wire.
-      //
-      // A create carries no snooze whatever it was handed. The control is not
-      // on the sheet, and a value nobody was shown is one nobody could correct:
-      // the sheet being the gate means what goes out is what was on it.
       await onSubmit({
         ...body,
-        ...(existing ? {} : { snooze: undefined }),
-        ...memberships(opened, body),
+        tags: words(tags).map((t) => t.replace(/^#/, '')),
+        blockedBy: words(blockers).map((id) => id.replace(/^\^/, '')),
+        // A new Task carries no value the form stopped showing when its State
+        // was changed: nobody can correct what is not on the screen. An edit
+        // sends only what changed, so a hidden one stays as it was.
+        ...(existing
+          ? {}
+          : {
+              reason: reasoned ? body.reason : '',
+              until: deferred ? body.until : '',
+            }),
       })
     } catch (caught) {
-      // The API's sentence is the one the CLI would have printed, and a value
-      // it could not read is still in the field it came back in, so whoever
-      // is looking at the sheet can correct that value rather than retype the
-      // whole Task.
+      // The API's sentence is the one the CLI would have printed, and the
+      // value it could not read is still in its field to be corrected.
       setError(sentence(caught))
       setWriting(false)
     }
@@ -114,17 +101,76 @@ export function Sheet({
       <label className="field">
         <span>Title</span>
         <input
-          value={body.title ?? ''}
+          value={body.title}
           onChange={(event) => say('title', event.target.value)}
           required
           autoFocus
         />
       </label>
 
+      {existing ? (
+        <p className="aside">
+          {body.repo} · {named(body.state)}
+        </p>
+      ) : (
+        <div className="pair">
+          <label className="field">
+            <span>Repo</span>
+            <select
+              value={body.repo}
+              onChange={(event) =>
+                setBody((was) => ({ ...was, repo: event.target.value }))
+              }
+            >
+              {repos.map((repo) => (
+                <option key={repo} value={repo}>
+                  {repo}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>State</span>
+            <select
+              value={body.state}
+              onChange={(event) =>
+                setBody((was) => ({
+                  ...was,
+                  state: event.target.value as Draft['state'],
+                }))
+              }
+            >
+              {STATES.map((state) => (
+                <option key={state} value={state}>
+                  {named(state)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+
+      {reasoned && (
+        <label className="field">
+          <span>Reason</span>
+          <input
+            value={body.reason}
+            onChange={(event) => say('reason', event.target.value)}
+          />
+        </label>
+      )}
+      {deferred && (
+        <Day
+          name="Until"
+          value={body.until}
+          onChange={(value) => say('until', value)}
+        />
+      )}
+
       <label className="field">
         <span>Description</span>
         <textarea
-          value={body.description ?? ''}
+          value={body.description}
           onChange={(event) => say('description', event.target.value)}
           rows={3}
         />
@@ -133,123 +179,71 @@ export function Sheet({
       <label className="field">
         <span>Why</span>
         <input
-          value={body.why ?? ''}
+          value={body.why}
           onChange={(event) => say('why', event.target.value)}
         />
       </label>
 
-      {/*
-        A date is typed, and picked beside being typed. The box is the field:
-        the Broker answers in prose and may say a day this program cannot read,
-        and a control holding only what it can parse would blank the answer on
-        the way to the screen, which is the one thing this sheet exists to
-        prevent. What it could not read stays in the box and the API says so in
-        its own words.
-
-        The picker writes into the box and never reads it. "next Friday" is not
-        a date it can show, and one that blanked or guessed at it would be that
-        same failure, only later. So it is the platform's own, uncontrolled,
-        and the box is still free text after a date lands in it.
-
-        It writes a date and never an empty one. A native date input fires a
-        change carrying "" when it is cleared, which a keystroke in it does, and
-        writing that through would blank the box -- that same failure, only by
-        the control that was put there to prevent it. Clearing the box is what
-        the box is for.
-
-        It blanks itself after each pick, which is what "never reads" comes to
-        in practice: left holding the day, an identical pick is not a change
-        and React fires nothing, so somebody who typed over a picked date could
-        not pick that same date again. The box is where a deadline is shown.
-      */}
-      <fieldset className="field">
-        <legend>Deadline</legend>
-        <div className="pair">
-          <input
-            aria-label="Deadline as typed"
-            value={body.deadline ?? ''}
-            onChange={(event) => say('deadline', event.target.value)}
-            placeholder="2026-03-04"
-          />
-          <input
-            type="date"
-            aria-label="Pick a deadline"
-            onChange={(event) => {
-              if (!event.target.value) return
-              say('deadline', event.target.value)
-              event.target.value = ''
-            }}
-          />
-        </div>
-      </fieldset>
-
       <label className="field">
-        <span>Estimate</span>
+        <span>Acceptance</span>
         <input
-          value={body.estimate ?? ''}
-          onChange={(event) => say('estimate', event.target.value)}
-          placeholder="90m"
+          value={body.acceptance}
+          onChange={(event) => say('acceptance', event.target.value)}
         />
       </label>
 
+      <label className="field">
+        <span>Tags</span>
+        <input
+          value={tags}
+          onChange={(event) => setTags(event.target.value)}
+          placeholder="#errand #van"
+        />
+      </label>
+
+      <Day
+        name="Deadline"
+        value={body.deadline}
+        onChange={(value) => say('deadline', value)}
+      />
+
+      <Choice
+        name="Estimate"
+        options={ESTIMATES}
+        value={body.estimate}
+        onPick={(value) => say('estimate', value)}
+      />
       <Choice
         name="Priority"
-        options={offered.priorities}
-        value={body.priority ?? ''}
-        onPick={(value) => setBody((was) => ({ ...was, priority: value }))}
+        options={LEVELS.map((value) => ({ value, label: value }))}
+        value={body.priority}
+        onPick={(value) => say('priority', value)}
       />
       <Choice
         name="Impact"
-        options={offered.impacts}
-        value={body.impact ?? ''}
-        onPick={(value) => setBody((was) => ({ ...was, impact: value }))}
+        options={LEVELS.map((value) => ({ value, label: value }))}
+        value={body.impact}
+        onPick={(value) => say('impact', value)}
       />
       <Choice
         name="Color"
-        options={offered.colors.map((name) => ({ name }))}
-        value={body.color ?? ''}
-        onPick={(value) => setBody((was) => ({ ...was, color: value }))}
+        options={COLORS.map((value) => ({ value, label: value }))}
+        value={body.color}
+        onPick={(value) => say('color', value)}
       />
 
-      {/*
-        Hiding a Task is something done to one that is already there, so the
-        control is on an edit and not on a create: the three things it says --
-        leave it alone, wake it, hide it for a span -- are two things and a
-        choice about a Task that does not exist yet.
-      */}
-      {existing && (
-        <Snooze
-          options={offered.snoozes}
-          value={body.snooze}
-          onPick={(value) => setBody((was) => ({ ...was, snooze: value }))}
+      <label className="field">
+        <span>Blocked by</span>
+        <input
+          value={blockers}
+          onChange={(event) => setBlockers(event.target.value)}
+          placeholder="m3qa, v9t1"
         />
-      )}
-
-      <Fields
-        on={body.fields ?? {}}
-        onChange={(fields) => setBody((was) => ({ ...was, fields }))}
-      />
+      </label>
 
       <Pointers
-        on={body.attachments ?? []}
-        onChange={(attachments) => setBody((was) => ({ ...was, attachments }))}
-      />
-
-      <Ticks
-        name="Lists"
-        kind="lists"
-        all={offered.lists}
-        on={body.intoLists ?? []}
-        onToggle={(id) => toggle('intoLists', id)}
-        onFail={setError}
-      />
-      <Ticks
-        name="Tags"
-        kind="tags"
-        all={offered.tags}
-        on={body.addTags ?? []}
-        onToggle={(id) => toggle('addTags', id)}
-        onFail={setError}
+        on={body.attach}
+        onChange={(attach) => setBody((was) => ({ ...was, attach }))}
       />
 
       <div className="buttons">
@@ -264,15 +258,55 @@ export function Sheet({
   )
 }
 
+/** Words typed with spaces or commas between them. */
+function words(text: string): string[] {
+  return text.split(/[\s,]+/).filter(Boolean)
+}
+
 /**
- * One attribute whose values are a list somebody picks from: a level, or a
- * color. A value that is none of them is offered as one more rather than
- * dropped, because the Broker chose the word and a list that silently cannot
- * hold it would lose what it said. The API refuses the ones it refuses, and
- * says so in the sentence the sheet shows.
- *
- * Empty clears the attribute, which is the same rule an emptied text field
- * follows.
+ * A date, typed and picked beside being typed. The box is the field: a day
+ * this program cannot read stays in it and the API says so in its own words.
+ * The picker writes into the box and never reads it, never writes an empty
+ * one (a native date input fires "" when it is cleared), and blanks itself
+ * after each pick so the same day can be picked again.
+ */
+function Day({
+  name,
+  value,
+  onChange,
+}: {
+  name: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <fieldset className="field">
+      <legend>{name}</legend>
+      <div className="pair">
+        <input
+          aria-label={`${name} as typed`}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="2026-03-04"
+        />
+        <input
+          type="date"
+          aria-label={`Pick ${name.toLowerCase()}`}
+          onChange={(event) => {
+            if (!event.target.value) return
+            onChange(event.target.value)
+            event.target.value = ''
+          }}
+        />
+      </div>
+    </fieldset>
+  )
+}
+
+/**
+ * One attribute picked from a list. A value that is none of them, typed into
+ * the file by hand or said by the Broker, is offered as one more rather than
+ * dropped; the API refuses it in its own words. Empty clears the attribute.
  */
 function Choice({
   name,
@@ -281,38 +315,22 @@ function Choice({
   onPick,
 }: {
   name: string
-  /**
-   * What is on offer, each with what choosing it means where the route says
-   * one. The levels carry an example and the colors do not: blue means blue.
-   * One prop and not a second list of names beside it, because two lists of
-   * the same values are two that can disagree.
-   */
-  options: { name: string; example?: string }[]
+  options: { value: string; label: string }[]
   value: string
   onPick: (value: string) => void
 }) {
-  const names = options.map((one) => one.name)
   const shown =
-    value === '' || names.includes(value)
+    value === '' || options.some((one) => one.value === value)
       ? options
-      : // A value the route does not offer is kept, under its own name and
-        // with nothing said about what it means, because the route is what
-        // says that and it said nothing about this one.
-        [...options, { name: value }]
+      : [...options, { value, label: value }]
   return (
     <label className="field">
       <span>{name}</span>
-      {/*
-        The example is in the option rather than under the picker, because the
-        question it answers is asked while the three are side by side. Showing
-        only the chosen one's would mean picking each in turn to read them,
-        which is the choice being made to find out what the choice is.
-      */}
       <select value={value} onChange={(event) => onPick(event.target.value)}>
         <option value="">—</option>
         {shown.map((one) => (
-          <option key={one.name} value={one.name}>
-            {one.example ? `${one.name} — ${one.example}` : one.name}
+          <option key={one.value} value={one.value}>
+            {one.label}
           </option>
         ))}
       </select>
@@ -321,140 +339,13 @@ function Choice({
 }
 
 /**
- * How long to hide the Task for. It is not a Choice because a Task cannot be
- * read back into one: what it carries is the instant it wakes rather than the
- * span somebody asked for, so the sheet never opens knowing the answer and the
- * two things leaving it alone and waking it up cannot be the same option.
- *
- * Undefined is left alone, which is what an untouched sheet sends and what
- * keeps a snoozed Task snoozed through an edit about something else. The empty
- * string wakes it, which is the only way back from a snooze on this surface.
- *
- * It is drawn on an edit alone. A create has no Task to hide, and `snooze` is
- * absent from what it submits rather than sent empty: absent is leave it
- * alone, which is the right thing to say about a Task being written now.
- */
-function Snooze({
-  options,
-  value,
-  onPick,
-}: {
-  options: string[]
-  value?: string
-  onPick: (value: string | undefined) => void
-}) {
-  // A snooze this side was never offered is shown as one more, the way a Choice
-  // shows a word it did not know: `write.Snooze` takes a plain duration as well
-  // as the four labels, and `store.SnoozeNames` serves the offer rather than the
-  // rule, so a Task snoozed by that duration from a terminal would otherwise
-  // reach this screen with its snooze blanked.
-  const shown =
-    value === undefined || value === '' || options.includes(value)
-      ? options
-      : [...options, value]
-  return (
-    <label className="field">
-      <span>Snooze</span>
-      <select
-        value={value === undefined ? 'leave' : value === '' ? 'wake' : value}
-        onChange={(event) => {
-          const picked = event.target.value
-          onPick(
-            picked === 'leave' ? undefined : picked === 'wake' ? '' : picked,
-          )
-        }}
-      >
-        <option value="leave">—</option>
-        <option value="wake">wake it</option>
-        {shown.map((one) => (
-          <option key={one} value={one}>
-            {one}
-          </option>
-        ))}
-      </select>
-    </label>
-  )
-}
-
-/**
- * The key/value pairs, edited in place with one blank row to add another.
- *
- * A value emptied removes its pair, which is the store's own rule rather than a
- * delete this side invents. A key is not renamed: the wire names a pair by its
- * key, so a rename is a removal and an addition, and offering it as one edit
- * would be the sheet describing a write the API does not make.
- */
-function Fields({
-  on,
-  onChange,
-}: {
-  on: Record<string, string>
-  onChange: (fields: Record<string, string>) => void
-}) {
-  const [key, setKey] = useState('')
-  const [value, setValue] = useState('')
-
-  const add = () => {
-    // An empty value is how the wire says remove, so adding a pair with one
-    // would draw a row that submitting deletes.
-    if (key === '' || value === '') return
-    onChange({ ...on, [key]: value })
-    setKey('')
-    setValue('')
-  }
-
-  return (
-    <fieldset className="field">
-      <legend>Fields</legend>
-      {Object.entries(on).map(([name, held]) => (
-        <label key={name} className="pair">
-          <span>{name}</span>
-          <input
-            value={held}
-            placeholder="empty removes it"
-            onChange={(event) =>
-              onChange({ ...on, [name]: event.target.value })
-            }
-          />
-        </label>
-      ))}
-      <div className="pair">
-        <input
-          value={key}
-          placeholder="name"
-          onChange={(event) => setKey(event.target.value)}
-        />
-        <input
-          value={value}
-          placeholder="value"
-          onChange={(event) => setValue(event.target.value)}
-        />
-        <button type="button" onClick={add} disabled={key === ''}>
-          Add
-        </button>
-      </div>
-    </fieldset>
-  )
-}
-
-/**
- * The Attachments to add, collected and not written. Each is its own guarded
- * write against a Task that may not exist yet, so submitting is what sends
- * them: a draft backed out of leaves no pointer behind because none was sent.
- *
- * Nothing here detaches. Remove drops one collected before anything was sent;
- * an edit opens with this empty rather than with what the Task carries, because
- * taking one off the Task is the detail screen's, which is the screen that can
- * show what is there.
+ * The Task's Attachments, one `attachment:` line each. An edit opens on the
+ * ones it carries, so Remove takes one off and Attach adds one; submitting
+ * sends the difference.
  *
  * A pointer is text and nothing else. Nothing is uploaded and nothing fetched,
  * so one naming a file names it on the machine `tasks api` runs on rather than
  * on the phone it was typed into.
- *
- * The repeat it refuses is a repeat of the text. The store trims a pointer and
- * makes a path absolute (`store.pointer`), so `./a` and `/cwd/a` are two rows
- * here and one pointer there; it is the store that says what a pointer is, and
- * this side is not going to work out a second answer to that question.
  */
 function Pointers({
   on,
@@ -573,124 +464,5 @@ function Machine({ onPick }: { onPick: (path: string) => void }) {
       })}
       {files.entries.length === 0 && <p className="aside">Nothing here.</p>}
     </div>
-  )
-}
-
-/**
- * The Lists or Tags the Task is filed under, ticked by id, with the row that
- * makes one more.
- *
- * An id the draft carries that the client cannot name is shown anyway, under
- * the id itself. That happens in the window before the first poll lands, and
- * the alternative is a membership submitted without ever being on the screen,
- * which is not what the sheet being the gate means.
- *
- * Making one is the sheet's one exception to nothing here writing, and it is
- * not really an exception: a List is an aggregate of its own, and the one made
- * here exists on the same terms as one made on the collections screen. It
- * outlives a sheet backed out of, so the row says so rather than letting
- * somebody discover it later. A blank set still draws, because a tracker with
- * no Lists is exactly where somebody needs to make the first one.
- *
- * The made one is held here until the poll names it, so it ticks under the word
- * that was typed rather than under its id for the second it takes to come back.
- * It is ticked on arrival: making a List from the form that files a Task under
- * one is somebody saying which List, not adding to a catalogue.
- */
-function Ticks({
-  name,
-  kind,
-  all,
-  on,
-  onToggle,
-  onFail,
-}: {
-  name: string
-  kind: Kind
-  all: Collection[]
-  on: string[]
-  onToggle: (id: string) => void
-  /** Where a refused creation is said, which is the sheet's own one place. */
-  onFail: (said: string) => void
-}) {
-  // Only the id and the name, because those are the two this side knows. A
-  // color and a count filled in here would be this side answering questions
-  // the store never answered, which is the rule the unnamed ids below follow.
-  const [made, setMade] = useState<{ id: string; name: string }[]>([])
-  const [naming, setNaming] = useState('')
-  const [making, setMaking] = useState(false)
-
-  const named = new Set(all.map((one) => one.id))
-  const held = made.filter((one) => !named.has(one.id))
-  const shown = [
-    ...all,
-    ...held,
-    ...on
-      .filter((id) => !named.has(id) && !held.some((one) => one.id === id))
-      .map((id) => ({ id, name: id })),
-  ]
-
-  // The singular, because the row is about making one. The plural is the
-  // legend above the ticks and says what the set is.
-  const singular = kind === 'lists' ? 'List' : 'Tag'
-
-  const make = async () => {
-    // The name as the store will hold it, since it trims one on the way in.
-    // Sending it untrimmed would draw the typed spacing until the poll took
-    // them away, which is this side describing a write it did not make.
-    const name = naming.trim()
-    setMaking(true)
-    try {
-      const id = await addCollection(kind, { name })
-      setMade((was) => [...was, { id, name }])
-      onToggle(id)
-      // Only if the box still holds what went out: a name typed while the
-      // request was in flight is the next one somebody means to make, and
-      // blanking it would throw away what they had just typed.
-      setNaming((now) => (now === naming ? '' : now))
-      // The sentence belonged to a write that has now been followed by one
-      // that landed, and a refusal left standing over a Collection that was
-      // made says the wrong thing about the tick beside it.
-      onFail('')
-    } catch (caught) {
-      onFail(sentence(caught))
-    } finally {
-      setMaking(false)
-    }
-  }
-
-  return (
-    <fieldset className="field">
-      <legend>{name}</legend>
-      {shown.map((one) => (
-        <label key={one.id} className="tick">
-          <input
-            type="checkbox"
-            checked={on.includes(one.id)}
-            onChange={() => onToggle(one.id)}
-          />
-          <span>{one.name}</span>
-        </label>
-      ))}
-      <div className="pair">
-        <input
-          aria-label={`New ${singular}`}
-          placeholder={`new ${singular.toLowerCase()}`}
-          value={naming}
-          onChange={(event) => setNaming(event.target.value)}
-        />
-        <button
-          type="button"
-          aria-label={`Add ${singular}`}
-          onClick={() => void make()}
-          disabled={making || naming.trim() === ''}
-        >
-          Add
-        </button>
-      </div>
-      <span className="aside">
-        Made when you tap Add, and kept even if this sheet is cancelled.
-      </span>
-    </fieldset>
   )
 }

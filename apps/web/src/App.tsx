@@ -6,6 +6,7 @@ import { useHold } from './hold'
 import { MoveTo } from './MoveTo'
 import { Narrow } from './Narrow'
 import { Panel } from './Panel'
+import { Sheet } from './Sheet'
 import { usePoll } from './poll'
 import {
   named,
@@ -16,10 +17,26 @@ import {
   type Task,
   WIDE,
 } from './state'
-import { moveTask } from './write'
+import {
+  addTask,
+  blank,
+  deleteTask,
+  type Draft,
+  draftOf,
+  editTask,
+  moveTask,
+} from './write'
 
 /** The Task a panel is open on. An id is unique only within its Repo. */
 type Opened = { id: string; repo: string }
+
+/**
+ * What the form is open on: a new Task, or one being edited, with its id and
+ * its tree's version as they were read when the form opened.
+ */
+type Form = { draft: Draft } & (
+  { id: string; version: string } | { id?: never }
+)
 
 /**
  * The board: six State lanes over every Repo, a card per leaf Task. It draws
@@ -30,16 +47,17 @@ type Opened = { id: string; repo: string }
  * need every Repo, Tag and parent whatever the lanes are narrowed to; the
  * narrowed one draws the lanes, and is not made while nothing is narrowed.
  *
- * The one write it makes is a move: a card dragged to another lane at a desk,
- * or held on a phone and sent through Move to. The next poll draws where it
- * landed. The other writes come with #122, and the box and the breakdown come
- * back with #123.
+ * A move is a card dragged to another lane at a desk, or held on a phone and
+ * sent through Move to. Add opens the form on a new Task, and a panel's Edit
+ * opens it on that Task. The next poll draws what any write did. The box and
+ * the breakdown come back with #123.
  */
 export function App() {
   const [narrowing, setNarrowing] = useState(WIDE)
   const [opened, setOpened] = useState<Opened | null>(linked)
   const [refusal, setRefusal] = useState<string | null>(null)
   const [moving, setMoving] = useState<Placed | null>(null)
+  const [form, setForm] = useState<Form | null>(null)
   // The card a drag picked up. It is kept here rather than in the drag's own
   // data, which a browser hands back only on the drop.
   const dragged = useRef<Placed | null>(null)
@@ -71,6 +89,13 @@ export function App() {
     }
   }
 
+  const save = async (after: Draft) => {
+    if (!form) return
+    if (form.id) await editTask(form.id, form.version, form.draft, after)
+    else await addTask(after)
+    setForm(null)
+  }
+
   const drop = (to: State) => (event: DragEvent) => {
     event.preventDefault()
     const card = dragged.current
@@ -93,6 +118,18 @@ export function App() {
           {said}
         </p>
       ))}
+      {wide.board && (
+        <button
+          type="button"
+          className="control"
+          disabled={wide.board.repos.length === 0}
+          onClick={() =>
+            setForm({ draft: blank(wide.board?.repos[0]?.name ?? '') })
+          }
+        >
+          Add
+        </button>
+      )}
       {wide.board && (
         <Narrow
           narrowing={narrowing}
@@ -181,14 +218,45 @@ export function App() {
             : `No Task ${opened.id} is on the board.`}
         </p>
       )}
-      {found && wide.board && (
+      {found && wide.board && !form && (
         <Panel
           repo={found.repo}
           task={found.task}
           today={wide.board.today}
           onOpen={(id) => open({ id, repo: found.repo.name })}
+          onEdit={() =>
+            setForm({
+              draft: draftOf(found.repo.name, found.task),
+              id: found.task.id,
+              version: found.task.version,
+            })
+          }
+          onDelete={async () => {
+            await deleteTask(found.repo.name, found.task.id, found.task.version)
+            open(null)
+          }}
           onClose={() => open(null)}
         />
+      )}
+      {form && wide.board && (
+        <>
+          <div className="scrim" aria-hidden="true" />
+          <div
+            className="panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label={form.id ? 'Edit the Task' : 'Add a Task'}
+          >
+            <Sheet
+              draft={form.draft}
+              repos={wide.board.repos.map((repo) => repo.name)}
+              existing={form.id !== undefined}
+              action={form.id ? 'Save' : 'Add'}
+              onSubmit={save}
+              onCancel={() => setForm(null)}
+            />
+          </div>
+        </>
       )}
     </main>
   )

@@ -365,3 +365,86 @@ test('a failed poll takes nothing off the board', async () => {
     expect(asked[1]?.init?.headers).toEqual({ 'If-None-Match': '"1"' }),
   )
 })
+
+const form = (name: string) => within(screen.getByRole('dialog', { name }))
+
+test('Add opens the form, and submitting it writes the Task', async () => {
+  writesAnswering({ status: 201, body: { id: 'n3w1' } })
+  render(<App />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Add' }))
+  const adding = form('Add a Task')
+  fireEvent.change(adding.getByLabelText('Title'), {
+    target: { value: 'Label the boxes' },
+  })
+  fireEvent.click(adding.getByRole('button', { name: 'Add' }))
+
+  await waitFor(() =>
+    expect(screen.queryByRole('dialog', { name: 'Add a Task' })).toBeNull(),
+  )
+  const [write] = writes()
+  expect(write?.url).toBe('/api/tasks')
+  expect(write?.body).toMatchObject({
+    repo: 'house-move',
+    title: 'Label the boxes',
+    state: 'inbox',
+  })
+})
+
+test('Edit opens the form on the Task and sends what changed', async () => {
+  writesAnswering({ status: 200, body: { id: 'm3qc' } })
+  render(<App />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Wrap glassware' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+  const editing = form('Edit the Task')
+  expect(editing.getByLabelText('Title')).toHaveProperty(
+    'value',
+    'Wrap glassware',
+  )
+  fireEvent.change(editing.getByLabelText('Priority'), {
+    target: { value: 'high' },
+  })
+  fireEvent.click(editing.getByRole('button', { name: 'Save' }))
+
+  await waitFor(() =>
+    expect(writes()).toEqual([
+      {
+        url: '/api/tasks/m3qc',
+        body: { repo: 'house-move', version: 'v0', priority: 'high' },
+      },
+    ]),
+  )
+})
+
+test('an edit to a tree changed since it was read is refused in the form', async () => {
+  const stale = "^m3qc's tree has changed since it was read; read it again"
+  writesAnswering({ status: 409, body: { error: stale } })
+  render(<App />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Wrap glassware' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+  const editing = form('Edit the Task')
+  fireEvent.change(editing.getByLabelText('Why'), {
+    target: { value: 'They break.' },
+  })
+  fireEvent.click(editing.getByRole('button', { name: 'Save' }))
+
+  expect(await editing.findByText(stale)).toBeDefined()
+})
+
+test('Delete takes a second tap, then deletes and closes the panel', async () => {
+  writesAnswering({ status: 200, body: { id: 'm3qc' } })
+  render(<App />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Wrap glassware' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+  expect(writes()).toEqual([])
+
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Delete it and its Subtasks' }),
+  )
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  expect(writes()).toEqual([
+    {
+      url: '/api/tasks/m3qc/delete',
+      body: { repo: 'house-move', version: 'v0' },
+    },
+  ])
+})

@@ -1,11 +1,10 @@
-// The calls that write. `moveTask` is the one the board makes. The rest are
-// the wire shapes the earlier write and Broker routes took: #122 brings the
-// other writes onto tasks.md, and #123 brings the Broker's routes back and
-// mounts `Box` and `Breakdown` again. They are kept so that work starts from
-// them.
+// The calls that write. `moveTask`, `addTask`, `editTask` and `deleteTask` are
+// the board's. `capture`, `ask`, `addSubtask` and `breakdown` are the wire
+// shapes the Broker routes took: #123 brings those routes back and mounts
+// `Box` and `Breakdown` again, and they are kept so that work starts from them.
 
-import { send, sentence } from './api'
-import { type Narrowing, queryString, type State } from './state'
+import { send } from './api'
+import { type Narrowing, queryString, type State, type Task } from './state'
 
 /**
  * Puts a Task in another State. The API holds every rule a move answers to,
@@ -24,52 +23,150 @@ export async function moveTask(
 }
 
 /**
- * A Task's attributes and its memberships as they are sent, and the same shape
- * `POST /api/capture` answers in: what the Broker read comes back as the body
- * this submits once somebody has corrected it.
- *
- * An absent attribute is left alone and an empty one is cleared, which is the
- * same rule a typed `-title ""` follows. Lists and Tags are the ids
- * `GET /api/state` already named.
+ * A Task as the form holds it, and as `POST /api/tasks` takes one: every
+ * attribute the form shows, as text, with the Repo it is written to. An empty
+ * value is an attribute the Task does not carry.
  */
-export type TaskBody = {
-  title?: string
-  description?: string
-  why?: string
-  color?: string
-  deadline?: string
-  estimate?: string
-  priority?: string
-  impact?: string
-  /**
-   * How long to hide the Task for, which the API reads from now: one of the
-   * offered labels or a plain duration. It is the one attribute a Task cannot
-   * be read back into, since what it carries is the instant it wakes rather
-   * than the span somebody asked for, so an absent one leaves the Task as it
-   * is and an empty one wakes it.
-   */
-  snooze?: string
-  /**
-   * The key/value pairs, sent whole. A key mapped to the empty string removes
-   * it and a key left out is left alone, which is the store's rule rather than
-   * a second one written here.
-   */
-  fields?: Record<string, string>
-  parent?: string
-  /**
-   * Pointers to attach once the Task exists. They never travel in the body: no
-   * write route takes an attachment and every one of them refuses a field it
-   * does not know, so `addTask`, `addSubtask`, `editTask` and `detachEdited`
-   * each split them off and attach them one at a time afterwards.
-   *
-   * Nothing here detaches. A pointer already on the Task is taken off from the
-   * detail screen, which is the only screen that can show what is there.
-   */
-  attachments?: string[]
-  intoLists?: string[]
-  outOfLists?: string[]
-  addTags?: string[]
-  dropTags?: string[]
+export type Draft = {
+  repo: string
+  title: string
+  state: State
+  tags: string[]
+  description: string
+  why: string
+  acceptance: string
+  deadline: string
+  priority: string
+  impact: string
+  estimate: string
+  color: string
+  blockedBy: string[]
+  reason: string
+  until: string
+  /** The Task's `attachment:` lines, one pointer each. */
+  attach: string[]
+}
+
+/** A Draft carrying nothing, in the Repo named and the Inbox. */
+export function blank(repo: string): Draft {
+  return {
+    repo,
+    title: '',
+    state: 'inbox',
+    tags: [],
+    description: '',
+    why: '',
+    acceptance: '',
+    deadline: '',
+    priority: '',
+    impact: '',
+    estimate: '',
+    color: '',
+    blockedBy: [],
+    reason: '',
+    until: '',
+    attach: [],
+  }
+}
+
+/** A Task as the form opens on it, read off the attributes the read carries. */
+export function draftOf(repo: string, task: Task): Draft {
+  const one = (label: string) =>
+    task.attrs.find((a) => a.label === label)?.value ?? ''
+  return {
+    repo,
+    title: task.title,
+    state: task.state,
+    tags: task.tags,
+    description: task.description,
+    why: one('why'),
+    acceptance: one('acceptance'),
+    deadline: one('deadline'),
+    priority: one('priority'),
+    impact: one('impact'),
+    estimate: one('estimate'),
+    color: one('color'),
+    blockedBy: one('blocked by')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean),
+    reason: one('reason'),
+    until: one('until'),
+    attach: task.attrs
+      .filter((a) => a.label === 'attachment')
+      .map((a) => a.value),
+  }
+}
+
+/** Writes one Task and names the Task it wrote. */
+export async function addTask(draft: Draft): Promise<string> {
+  const written = await send<{ id: string }>('POST', '/api/tasks', draft)
+  return written.id
+}
+
+/** The text attributes an edit compares one by one. */
+const SAID = [
+  'title',
+  'description',
+  'why',
+  'acceptance',
+  'deadline',
+  'priority',
+  'impact',
+  'estimate',
+  'color',
+  'reason',
+  'until',
+] as const
+
+/**
+ * Sends what changed between the Task as the form opened on it and the form
+ * now. An attribute left as it was is left out, so an edit to one never
+ * rewrites another that somebody else changed meanwhile, nor one the form does
+ * not show. Tags and Blocked by go whole when they changed; attachments go as
+ * the pointers added and the pointers taken off. `version` is the Task's tree
+ * as it was read, and the API refuses the edit when that tree has changed.
+ */
+export async function editTask(
+  id: string,
+  version: string,
+  before: Draft,
+  after: Draft,
+): Promise<void> {
+  const body: Record<string, unknown> = { repo: after.repo, version }
+  for (const name of SAID) {
+    if (after[name] !== before[name]) body[name] = after[name]
+  }
+  for (const name of ['tags', 'blockedBy'] as const) {
+    if (after[name].join(' ') !== before[name].join(' ')) {
+      body[name] = after[name]
+    }
+  }
+  const attach = after.attach.filter((p) => !before.attach.includes(p))
+  const detach = before.attach.filter((p) => !after.attach.includes(p))
+  if (attach.length > 0) body.attach = attach
+  if (detach.length > 0) body.detach = detach
+  await send<{ id: string }>(
+    'POST',
+    `/api/tasks/${encodeURIComponent(id)}`,
+    body,
+  )
+}
+
+/**
+ * Takes the Task out of its Repo's file, its Subtasks with it, refused when
+ * its tree has changed since `version` was read.
+ */
+export async function deleteTask(
+  repo: string,
+  id: string,
+  version: string,
+): Promise<void> {
+  await send<{ id: string }>(
+    'POST',
+    `/api/tasks/${encodeURIComponent(id)}/delete`,
+    { repo, version },
+  )
 }
 
 /**
@@ -77,8 +174,8 @@ export type TaskBody = {
  * body the add sheet submits. It writes nothing: a dump read and then
  * abandoned leaves nothing behind, so the sheet is the gate.
  */
-export function capture(text: string): Promise<TaskBody> {
-  return send<TaskBody>('POST', '/api/capture', { text })
+export function capture(text: string): Promise<Partial<Draft>> {
+  return send<Partial<Draft>>('POST', '/api/capture', { text })
 }
 
 /**
@@ -102,84 +199,17 @@ export async function ask(
   return said.answer
 }
 
-/**
- * Splits the pointers off a body. The routes refuse a field they do not know,
- * and an Attachment is a write of its own against a Task that has to exist
- * first, so this is where the two part company.
- */
-function unattached(body: TaskBody): [TaskBody, string[]] {
-  const { attachments, ...rest } = body
-  return [rest, attachments ?? []]
-}
-
-/**
- * Attaches each pointer to a Task that now exists. One at a time and in order,
- * because each is its own guarded write; a refusal on one stops there, with the
- * Task and whatever was attached before it left standing.
- *
- * The sentence says the Task was written, because the form that sent it cannot
- * tell otherwise: every other way a submit fails leaves nothing behind, and a
- * second press of the same button after this one would write a second Task
- * rather than retry the pointer. What did not land is added from the Task
- * itself, which is the screen that can show what is already on it.
- */
-async function attachAll(id: string, pointers: string[]): Promise<void> {
-  for (const [landed, pointer] of pointers.entries()) {
-    try {
-      await attach(id, pointer)
-    } catch (caught) {
-      throw new Error(
-        `the task was written, and ${landed} of ${pointers.length} attachments with it. ` +
-          `${pointer} was refused: ${sentence(caught)}. ` +
-          `Add the rest from the task rather than submitting again, which writes a second task.`,
-        { cause: caught },
-      )
-    }
-  }
-}
-
-/** Writes one Task and files it, and names the Task it wrote. */
-export async function addTask(body: TaskBody): Promise<string> {
-  const [create, pointers] = unattached(body)
-  const written = await send<{ id: string }>('POST', '/api/tasks', create)
-  await attachAll(written.id, pointers)
-  return written.id
-}
-
 /** Writes one Task under another, which is the same write with a parent. */
 export async function addSubtask(
   parent: string,
-  body: TaskBody,
+  body: Partial<Draft>,
 ): Promise<string> {
-  const [create, pointers] = unattached(body)
   const written = await send<{ id: string }>(
     'POST',
     `/api/tasks/${encodeURIComponent(parent)}/subtasks`,
-    create,
+    body,
   )
-  await attachAll(written.id, pointers)
   return written.id
-}
-
-/**
- * The Lists and Tags one write joins and leaves, worked out from what the
- * Task carried when the sheet opened and what is ticked on it now.
- *
- * Ticking and unticking are different fields on the wire, so the difference has
- * to be taken somewhere: taking it here means a sheet opened on a Task and a
- * sheet opened on a draft submit the same body, and an untick is a membership
- * dropped rather than one silently left on.
- */
-export function memberships(before: TaskBody, after: TaskBody): TaskBody {
-  const on = (body: TaskBody, name: 'intoLists' | 'addTags') => body[name] ?? []
-  const missing = (from: string[], against: string[]) =>
-    from.filter((id) => !against.includes(id))
-  return {
-    intoLists: missing(on(after, 'intoLists'), on(before, 'intoLists')),
-    outOfLists: missing(on(before, 'intoLists'), on(after, 'intoLists')),
-    addTags: missing(on(after, 'addTags'), on(before, 'addTags')),
-    dropTags: missing(on(before, 'addTags'), on(after, 'addTags')),
-  }
 }
 
 /** One question the Broker asked and the answer it was given back. */
@@ -189,13 +219,15 @@ export type QA = { question: string; answer: string }
  * One Subtask the Broker proposes. Exactly the six `ai.Proposal` carries in
  * `apps/tasks/src/ai/ai.go` and no more: a proposal is approved on what was
  * drawn beside its tick, so an attribute this type admits is one the screen
- * has to draw. `TaskBody` is wider and is what the approval goes out as, and
+ * has to draw. `Draft` is wider and is what the approval goes out as, and
  * typing a proposal as one would let a deadline nobody saw be written by a
  * route that never answers one.
  */
-export type Proposal = Pick<
-  TaskBody,
-  'title' | 'description' | 'why' | 'estimate' | 'priority' | 'impact'
+export type Proposal = Partial<
+  Pick<
+    Draft,
+    'title' | 'description' | 'why' | 'estimate' | 'priority' | 'impact'
+  >
 >
 
 /**
@@ -215,45 +247,4 @@ export type Step = {
  */
 export function breakdown(task: string, answers: QA[]): Promise<Step> {
   return send<Step>('POST', '/api/breakdown', { task, answers })
-}
-
-/**
- * A List or a Tag as `api.collectionBody` takes one. Both attributes follow the
- * same rule every attribute of a Task follows: absent leaves it alone, which is
- * what makes a rename and a recolor one body rather than two writes.
- */
-export type CollectionBody = {
-  name?: string
-  color?: string
-}
-
-/**
- * Which of the two a write is about, as the path spells it. A List and a Tag
- * are the same three writes against different aggregates, so the calls are
- * written once and given the segment, the way `api.kind` hands the routes a
- * pair of store calls rather than writing each route twice.
- */
-export type Kind = 'lists' | 'tags'
-
-/** Writes one List or Tag and names it. */
-export async function addCollection(
-  kind: Kind,
-  body: CollectionBody,
-): Promise<string> {
-  const written = await send<{ id: string }>('POST', `/api/${kind}`, body)
-  return written.id
-}
-
-/**
- * Points a Task at something outside the tracker: a web address, or a path as
- * the machine running `tasks api` would read it. Nothing is uploaded and nothing
- * is copied -- an Attachment is the text and nothing else, so a pointer typed
- * on a phone naming a file on that phone points nowhere anybody can follow.
- */
-export async function attach(id: string, target: string): Promise<void> {
-  await send<{ id: string }>(
-    'POST',
-    `/api/tasks/${encodeURIComponent(id)}/attachments`,
-    { target },
-  )
 }

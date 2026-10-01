@@ -1,10 +1,11 @@
 // One Task, opened to read: every attribute it carries, its parent with the
 // State the server worked out for it, and its Subtasks. A bottom sheet on a
-// phone and a side panel at a desk, which is CSS's to decide. Nothing in it
-// edits.
+// phone and a side panel at a desk, which is CSS's to decide. Edit opens the
+// form on it, and Delete takes two taps.
 
-import { Fragment, useEffect } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 
+import { sentence } from './api'
 import { Due } from './Due'
 import { type Repo, type State, type Task } from './state'
 
@@ -23,6 +24,8 @@ export function Panel({
   task,
   today,
   onOpen,
+  onEdit,
+  onDelete,
   onClose,
 }: {
   /** The Repo's wide read, in file order, so the whole tree is in it. */
@@ -30,8 +33,29 @@ export function Panel({
   task: Task
   today: string
   onOpen: (id: string) => void
+  onEdit: () => void
+  /** Deletes the Task, its Subtasks with it, and rejects with a refusal. */
+  onDelete: () => Promise<void>
   onClose: () => void
 }) {
+  // The first tap on Delete asks; the second deletes. No browser dialog,
+  // which would block the page.
+  const [sure, setSure] = useState(false)
+  const [refusal, setRefusal] = useState<string | null>(null)
+
+  const remove = async () => {
+    if (!sure) {
+      setSure(true)
+      return
+    }
+    try {
+      await onDelete()
+    } catch (caught) {
+      setRefusal(sentence(caught))
+      setSure(false)
+    }
+  }
+
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
@@ -61,10 +85,21 @@ export function Panel({
         aria-labelledby="panel-title"
       >
         <div className="panel-bar">
+          <button type="button" className="control" onClick={onEdit}>
+            Edit
+          </button>
+          <button
+            type="button"
+            className="control"
+            onClick={() => void remove()}
+          >
+            {sure ? 'Delete it and its Subtasks' : 'Delete'}
+          </button>
           <button type="button" className="control" onClick={onClose}>
             Close
           </button>
         </div>
+        {refusal && <p className="message">{refusal}</p>}
         {parent && (
           <button
             type="button"

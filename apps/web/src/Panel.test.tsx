@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-// The read-only panel: tapping a card opens every attribute it has, and a
+// The panel: tapping a card opens every attribute it has, and a
 // Subtask's panel opens on its parent, with the parent's worked-out State and
 // how many of its leaves sit in each State. `?task=<id>&repo=<name>` opens a
 // panel on load, and opening or closing one keeps the address in step, so a
@@ -34,7 +34,7 @@ const open = async (title: string) => {
   return within(screen.getByRole('dialog', { name: title }))
 }
 
-test('tapping a card opens every attribute it has, and nothing to edit', async () => {
+test('tapping a card opens every attribute it has, read-only', async () => {
   render(<App />)
   const panel = await open('Wrap glassware')
 

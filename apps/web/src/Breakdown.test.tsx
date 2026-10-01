@@ -31,6 +31,7 @@ const TASK: Task = {
   leaf: true,
   blocked: false,
   rank: 0,
+  version: 'v0',
 }
 
 test('every attribute a proposal would write is drawn beside its tick', async () => {
