@@ -16,12 +16,15 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/possiblyneal/tasks-md/apps/tasks/src/history"
+	"github.com/possiblyneal/tasks-md/apps/tasks/src/repos"
 	"github.com/possiblyneal/tasks-md/apps/tasks/src/taskfile"
 )
 
@@ -177,7 +180,7 @@ func Move(dir, actor, id string, to taskfile.State, reason, until string) error 
 		if path == nil {
 			return "", "", NoTask(id)
 		}
-		t := path[len(path)-1].task
+		t := path.task()
 		if len(t.Subtasks) > 0 {
 			return "", "", Refused{fmt.Sprintf("^%s is a parent: its State is worked out from its Subtasks, so move one of them", id)}
 		}
@@ -228,7 +231,7 @@ func AddSubtasks(dir, actor, parent, version string, subtasks []New) ([]string, 
 			return "", "", err
 		}
 		ids := every(f.Tasks)
-		under := path[len(path)-1].task
+		under := path.task()
 		was := make([]bool, len(path))
 		for i, at := range path {
 			was[i] = at.task.State.Ended()
@@ -294,6 +297,15 @@ type at struct {
 	siblings *[]*taskfile.Task
 }
 
+// trail is the way down to one Task, outermost first.
+type trail []at
+
+// last is where the Task the trail leads to sits.
+func (p trail) last() at { return p[len(p)-1] }
+
+// task is the Task the trail leads to.
+func (p trail) task() *taskfile.Task { return p.last().task }
+
 // arrange writes `ended:` and moves the Task within its level when it has
 // ended or reopened: an ended Task goes to the bottom, after those that ended
 // before it, and a reopened one to the bottom of the open ones.
@@ -313,7 +325,7 @@ func (a at) arrange(wasEnded bool) {
 }
 
 // find is the way down to the Task with the id, outermost first, or nil.
-func find(f *taskfile.File, id string) []at {
+func find(f *taskfile.File, id string) trail {
 	var walk func(*[]*taskfile.Task) []at
 	walk = func(list *[]*taskfile.Task) []at {
 		for _, t := range *list {
@@ -328,6 +340,17 @@ func find(f *taskfile.File, id string) []at {
 		return nil
 	}
 	return walk(&f.Tasks)
+}
+
+// read is the Repo's TASKS.md as it stands, read without the lock and its
+// problems left to lint: what a read or a check before a write needs.
+func read(dir string) (*taskfile.File, error) {
+	text, err := os.ReadFile(filepath.Join(dir, repos.FileName))
+	if err != nil {
+		return nil, err
+	}
+	f, _ := taskfile.Parse(string(text))
+	return f, nil
 }
 
 // parse reads the file a write is about to rewrite, refusing one with a line

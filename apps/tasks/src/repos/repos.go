@@ -23,6 +23,15 @@ import (
 	"strings"
 )
 
+// FileName is the store's file in a Repo.
+const FileName = "TASKS.md"
+
+// Holds says whether dir holds a TASKS.md that is a file.
+func Holds(dir string) bool {
+	info, err := os.Stat(filepath.Join(dir, FileName))
+	return err == nil && info.Mode().IsRegular()
+}
+
 // Repo is a folder holding a TASKS.md. Name is the folder's name under its
 // root, which is how a person names it; Path is where it really is, with any
 // link resolved.
@@ -32,7 +41,7 @@ type Repo struct {
 }
 
 // File is the Repo's TASKS.md.
-func (r Repo) File() string { return filepath.Join(r.Path, "TASKS.md") }
+func (r Repo) File() string { return filepath.Join(r.Path, FileName) }
 
 // ConfigPath is ~/.config/tasks/config, or under $XDG_CONFIG_HOME when that is
 // set.
@@ -122,7 +131,7 @@ func Find(roots []string) ([]Repo, []error) {
 				continue
 			}
 			path := filepath.Join(root, name)
-			if info, err := os.Stat(filepath.Join(path, "TASKS.md")); err != nil || !info.Mode().IsRegular() {
+			if !Holds(path) {
 				continue
 			}
 			real, err := filepath.EvalSymlinks(path)

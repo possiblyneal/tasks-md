@@ -304,7 +304,7 @@ func nearest(name string) (string, error) {
 	}
 	start := history.MainCheckout(cwd)
 	for dir := start; ; dir = filepath.Dir(dir) {
-		if info, err := os.Stat(filepath.Join(dir, "TASKS.md")); err == nil && info.Mode().IsRegular() {
+		if repos.Holds(dir) {
 			return filepath.EvalSymlinks(dir)
 		}
 		if dir == filepath.Dir(dir) {

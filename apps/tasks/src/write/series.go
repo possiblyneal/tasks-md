@@ -2,8 +2,6 @@ package write
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -48,7 +46,7 @@ func Repeat(dir, actor, id, rule string) error {
 		if path == nil {
 			return "", "", NoTask(id)
 		}
-		set(path[len(path)-1].task, "series", written)
+		set(path.task(), "series", written)
 		return taskfile.Write(f), "repeat ^" + id + " " + subject, nil
 	})
 }
@@ -56,16 +54,15 @@ func Repeat(dir, actor, id, rule string) error {
 // SeriesOf is the Series on the Task with the id in dir's TASKS.md, with its
 // next dates counted from today. It writes nothing.
 func SeriesOf(dir, id string, today time.Time) (Series, error) {
-	text, err := os.ReadFile(filepath.Join(dir, "TASKS.md"))
+	f, err := read(dir)
 	if err != nil {
 		return Series{}, err
 	}
-	f, _ := taskfile.Parse(string(text))
 	path := find(f, id)
 	if path == nil {
 		return Series{}, NoTask(id)
 	}
-	s := Series{Rule: path[len(path)-1].task.Attr("series"), Dates: []string{}}
+	s := Series{Rule: path.task().Attr("series"), Dates: []string{}}
 	if s.Rule == "" {
 		return s, nil
 	}

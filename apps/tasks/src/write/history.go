@@ -1,8 +1,6 @@
 package write
 
 import (
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -25,11 +23,11 @@ type Entry struct {
 // hand edit to a Subtask is drawn on the Subtask alone. A Repo with no tasks
 // history yet answers none. It writes nothing.
 func HistoryOf(dir, id string) ([]Entry, error) {
-	text, err := os.ReadFile(filepath.Join(dir, "TASKS.md"))
+	f, err := read(dir)
 	if err != nil {
 		return nil, err
 	}
-	if f, _ := taskfile.Parse(string(text)); find(f, id) == nil {
+	if find(f, id) == nil {
 		return nil, NoTask(id)
 	}
 	log, err := history.Log(dir)
@@ -79,7 +77,7 @@ func touched(dir string, c history.Commit, id string) (bool, error) {
 func own(text, id string) (string, bool) {
 	f, _ := taskfile.Parse(text)
 	var order []*taskfile.Task
-	walkPaths(f, func(path []at) { order = append(order, path[len(path)-1].task) })
+	walkPaths(f, func(path trail) { order = append(order, path.task()) })
 	lines := strings.Split(text, "\n")
 	for i, t := range order {
 		if t.ID != id {

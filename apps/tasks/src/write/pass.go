@@ -1,8 +1,6 @@
 package write
 
 import (
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -28,11 +26,7 @@ func Pass(today time.Time, dirs ...string) {
 	for _, dir := range dirs {
 		// The file is read without the lock first, so a pass with nothing to
 		// do costs a read rather than a commit's worth of git.
-		text, err := os.ReadFile(filepath.Join(dir, "TASKS.md"))
-		if err != nil {
-			continue
-		}
-		if f, _ := taskfile.Parse(string(text)); len(due(f, today, every(f.Tasks))) == 0 {
+		if f, err := read(dir); err != nil || len(due(f, today, every(f.Tasks))) == 0 {
 			continue
 		}
 		_ = history.Write(dir, Server, func(before string) (string, string, error) {
@@ -54,9 +48,9 @@ func Pass(today time.Time, dirs ...string) {
 func due(f *taskfile.File, today time.Time, used map[string]struct{}) []string {
 	date := today.Format(time.DateOnly)
 	var done []string
-	var ended [][]at
-	walkPaths(f, func(path []at) {
-		t := path[len(path)-1].task
+	var ended []trail
+	walkPaths(f, func(path trail) {
+		t := path.task()
 		if len(t.Subtasks) == 0 && t.State == taskfile.Deferred && t.Attr("until") != "" && t.Attr("until") <= date {
 			t.State = taskfile.Backlog
 			set(t, "until", "")
@@ -81,8 +75,8 @@ func due(f *taskfile.File, today time.Time, used map[string]struct{}) []string {
 // next is due on the first date the rule produces after both today and the
 // ended one's Deadline, so missed dates are not made up and an early finish
 // does not repeat its own date. The copy is named from ids not in used.
-func repeat(f *taskfile.File, path []at, today time.Time, used map[string]struct{}) string {
-	old := path[len(path)-1]
+func repeat(f *taskfile.File, path trail, today time.Time, used map[string]struct{}) string {
+	old := path.last()
 	rule, err := schedule.Parse(old.task.Attr("series"))
 	if err != nil {
 		// A rule nobody can read is left where it is for a person to fix.
@@ -169,7 +163,7 @@ func reset(t *taskfile.Task, named map[*taskfile.Task]string, renamed map[string
 
 // walkPaths calls visit with the way down to every Task in f, outermost first, in
 // file order.
-func walkPaths(f *taskfile.File, visit func([]at)) {
+func walkPaths(f *taskfile.File, visit func(trail)) {
 	var down func(list *[]*taskfile.Task, above []at)
 	down = func(list *[]*taskfile.Task, above []at) {
 		for _, t := range *list {

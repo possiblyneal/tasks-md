@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/possiblyneal/tasks-md/apps/tasks/src/history"
+	"github.com/possiblyneal/tasks-md/apps/tasks/src/repos"
 	"github.com/possiblyneal/tasks-md/apps/tasks/src/taskfile"
 )
 
@@ -44,7 +45,7 @@ func EditTask(dir, actor, id string, e Edit) error {
 		if err != nil {
 			return "", "", err
 		}
-		t := path[len(path)-1].task
+		t := path.task()
 		// The fields given are checked as an add would check them, against
 		// the Task's own State, so an edit holds the rules an add does.
 		n := New{Title: t.Title, State: string(t.State), Attach: e.Attach}
@@ -117,7 +118,7 @@ func Delete(dir, actor, id, version string) error {
 		if err != nil {
 			return "", "", err
 		}
-		at := path[len(path)-1]
+		at := path.last()
 		gone := every([]*taskfile.Task{at.task})
 		*at.siblings = slices.DeleteFunc(*at.siblings, func(t *taskfile.Task) bool { return t == at.task })
 
@@ -190,12 +191,11 @@ func RenameTag(dirs []string, actor, from, to string, versions []string) ([]stri
 	// A Repo carrying no Task with the Tag is left alone, broken or not.
 	var carrying []string
 	for _, dir := range dirs {
-		text, err := os.ReadFile(filepath.Join(dir, "TASKS.md"))
+		text, err := os.ReadFile(filepath.Join(dir, repos.FileName))
 		if err != nil {
 			return nil, err
 		}
-		f, _ := taskfile.Parse(string(text))
-		if !carries(f.Tasks, from) {
+		if f, _ := taskfile.Parse(string(text)); !carries(f.Tasks, from) {
 			continue
 		}
 		if _, _, err := rename(dir)(string(text)); err != nil {
@@ -213,7 +213,7 @@ func RenameTag(dirs []string, actor, from, to string, versions []string) ([]stri
 
 // open reads the file an edit or a delete rewrites and finds the Task, refusing
 // the write when the caller read the Task's tree as it no longer stands.
-func open(before, id, version string) (*taskfile.File, []at, error) {
+func open(before, id, version string) (*taskfile.File, trail, error) {
 	f, err := parse(before)
 	if err != nil {
 		return nil, nil, err

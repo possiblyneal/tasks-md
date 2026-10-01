@@ -25,11 +25,13 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/possiblyneal/tasks-md/apps/tasks/src/repos"
 )
 
 const (
 	gitDir = ".tasks.git"
-	file   = "TASKS.md"
+	file   = repos.FileName
 	branch = "tasks"
 	remote = "origin"
 )
