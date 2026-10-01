@@ -83,6 +83,19 @@ func Handler(o Options) http.Handler {
 	mux.HandleFunc("POST /api/tasks/{id}/delete", func(w http.ResponseWriter, r *http.Request) {
 		remove(o, w, r)
 	})
+	mux.HandleFunc("POST /api/tasks/{id}/subtasks", func(w http.ResponseWriter, r *http.Request) {
+		subtasks(o, w, r)
+	})
+	// The Broker's three: each reads, makes one turn and writes nothing.
+	mux.HandleFunc("POST /api/capture", func(w http.ResponseWriter, r *http.Request) {
+		capture(o, w, r)
+	})
+	mux.HandleFunc("POST /api/ask", func(w http.ResponseWriter, r *http.Request) {
+		ask(o, w, r)
+	})
+	mux.HandleFunc("POST /api/breakdown", func(w http.ResponseWriter, r *http.Request) {
+		breakdown(o, w, r)
+	})
 	mux.HandleFunc("POST /api/tags/rename", func(w http.ResponseWriter, r *http.Request) {
 		rename(o, w, r)
 	})

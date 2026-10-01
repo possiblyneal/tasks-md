@@ -96,28 +96,7 @@ func Add(dir, actor string, n New) (string, error) {
 			return "", "", err
 		}
 		id = fresh(ids)
-		t := &taskfile.Task{Title: n.Title, State: state, Tags: n.Tags, ID: id, Created: today(), Description: n.Description}
-		for _, a := range []taskfile.Attr{
-			{Label: "deadline", Value: n.Deadline},
-			{Label: "priority", Value: n.Priority},
-			{Label: "impact", Value: n.Impact},
-			{Label: "estimate", Value: n.Estimate},
-			{Label: "color", Value: n.Color},
-			{Label: "why", Value: n.Why},
-			{Label: "acceptance", Value: n.Acceptance},
-			{Label: "blocked by", Value: strings.Join(n.BlockedBy, ", ")},
-			{Label: "until", Value: n.Until},
-			{Label: "reason", Value: n.Reason},
-		} {
-			set(t, a.Label, a.Value)
-		}
-		attach(t, n.Attach, nil)
-		if state.Ended() {
-			set(t, "ended", today())
-			f.Tasks = append(f.Tasks, t)
-		} else {
-			f.Tasks = slices.Insert(f.Tasks, firstEnded(f.Tasks), t)
-		}
+		place(&f.Tasks, n.task(state, id))
 		return taskfile.Write(f), "add ^" + id + " " + n.Title, nil
 	})
 	return id, err
@@ -216,6 +195,80 @@ func Move(dir, actor, id string, to taskfile.State, reason string) error {
 		}
 		return taskfile.Write(f), "move ^" + id + " to " + title(to), nil
 	})
+}
+
+// AddSubtasks writes Subtasks under the parent as one commit, in the order
+// given, and gives back their ids. version is the parent's tree's as it was
+// read, or empty to write whatever the tree is now.
+func AddSubtasks(dir, actor, parent, version string, subtasks []New) ([]string, error) {
+	if len(subtasks) == 0 {
+		return nil, Invalid{errors.New("give at least one Subtask")}
+	}
+	states := make([]taskfile.State, len(subtasks))
+	for i, n := range subtasks {
+		state, err := n.check()
+		if err != nil {
+			return nil, err
+		}
+		states[i] = state
+	}
+	var made []string
+	err := history.Write(dir, actor, func(before string) (string, string, error) {
+		made = nil
+		f, path, err := open(before, parent, version)
+		if err != nil {
+			return "", "", err
+		}
+		fill(f)
+		ids := every(f.Tasks)
+		under := path[len(path)-1].task
+		for i, n := range subtasks {
+			if err := blockers(n.BlockedBy, ids, ""); err != nil {
+				return "", "", err
+			}
+			id := fresh(ids)
+			ids[id] = struct{}{}
+			made = append(made, id)
+			place(&under.Subtasks, n.task(states[i], id))
+		}
+		return taskfile.Write(f), "add ^" + strings.Join(made, " ^") + " under ^" + parent, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return made, nil
+}
+
+// task is the new Task the fields describe.
+func (n New) task(state taskfile.State, id string) *taskfile.Task {
+	t := &taskfile.Task{Title: n.Title, State: state, Tags: n.Tags, ID: id, Created: today(), Description: n.Description}
+	for _, a := range []taskfile.Attr{
+		{Label: "deadline", Value: n.Deadline},
+		{Label: "priority", Value: n.Priority},
+		{Label: "impact", Value: n.Impact},
+		{Label: "estimate", Value: n.Estimate},
+		{Label: "color", Value: n.Color},
+		{Label: "why", Value: n.Why},
+		{Label: "acceptance", Value: n.Acceptance},
+		{Label: "blocked by", Value: strings.Join(n.BlockedBy, ", ")},
+		{Label: "until", Value: n.Until},
+		{Label: "reason", Value: n.Reason},
+	} {
+		set(t, a.Label, a.Value)
+	}
+	attach(t, n.Attach, nil)
+	return t
+}
+
+// place puts a new Task into its level: an ended one at the bottom, an open
+// one above the first ended.
+func place(list *[]*taskfile.Task, t *taskfile.Task) {
+	if t.State.Ended() {
+		set(t, "ended", today())
+		*list = append(*list, t)
+		return
+	}
+	*list = slices.Insert(*list, firstEnded(*list), t)
 }
 
 // at is one Task on the way down to another, with the list it sits in.

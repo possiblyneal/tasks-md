@@ -10,20 +10,20 @@ import (
 
 // Everything the broker needs to read a dump goes with it, because it holds
 // nothing between calls: the date a "tomorrow" is counted from, and the names
-// it may file under. Without the date it invents one; without the names it
-// invents a List.
+// it may choose from. Without the date it invents one; without the names it
+// invents a Repo.
 func TestADumpCarriesTheDateAndTheNamesItMayChooseFrom(t *testing.T) {
 	var sent string
 	c := broker(t, func(w http.ResponseWriter, body map[string]any) {
 		out, _ := json.Marshal(body["messages"])
 		sent = string(out)
-		completion(w, `{"title":"Call the dentist","deadline":"2026-09-10","lists":["Home"]}`)
+		completion(w, `{"title":"Call the dentist","deadline":"2026-09-10","repo":"Home"}`)
 	})
 
 	read, err := c.Read(context.Background(), Dump{
 		Text:  "call the dentist tomorrow before noon",
 		Today: "2026-09-09, Wednesday",
-		Lists: []string{"Home", "Work"},
+		Repos: []string{"Home", "Work"},
 		Tags:  []string{"urgent"},
 	})
 	if err != nil {
@@ -37,8 +37,8 @@ func TestADumpCarriesTheDateAndTheNamesItMayChooseFrom(t *testing.T) {
 	if read.Title != "Call the dentist" || read.Deadline != "2026-09-10" {
 		t.Errorf("the capture came back %+v, want the title and the date it worked out", read)
 	}
-	if len(read.Lists) != 1 || read.Lists[0] != "Home" {
-		t.Errorf("the capture filed it under %v, want the one List", read.Lists)
+	if read.Repo != "Home" {
+		t.Errorf("the capture guessed Repo %q, want Home", read.Repo)
 	}
 }
 

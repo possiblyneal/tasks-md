@@ -130,10 +130,8 @@ func rename(o Options, w http.ResponseWriter, r *http.Request) {
 // misspelt attribute is not dropped quietly, and finds the Repo it names with
 // the pass run over it.
 func decode(o Options, r *http.Request, body any, repo *string) (string, error) {
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(body); err != nil {
-		return "", usage{err}
+	if err := strict(r, body); err != nil {
+		return "", err
 	}
 	if *repo == "" {
 		return "", usage{errors.New("a write names its Repo in the body's repo")}

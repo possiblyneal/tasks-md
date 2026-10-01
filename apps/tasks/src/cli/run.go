@@ -34,6 +34,7 @@ var verbs = []struct {
 	{"repos", listRepos},
 	{"lint", lint},
 	{"add", add},
+	{"capture", capture},
 	{"edit", edit},
 	{"move", move},
 	{"delete", remove},

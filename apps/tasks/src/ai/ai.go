@@ -66,14 +66,17 @@ func New() *Client {
 // Brief is a Task as the broker is shown it: what it says, and nothing about
 // how this program stores it. No id crosses the wire, because an id means
 // nothing to the broker and a proposal is matched to its parent on this side.
+// The Repo and Tags are by name for the same reason.
 type Brief struct {
-	Title       string `json:"title"`
-	Description string `json:"description,omitempty"`
-	Why         string `json:"why,omitempty"`
-	Deadline    string `json:"deadline,omitempty"`
-	Estimate    string `json:"estimate,omitempty"`
-	Priority    string `json:"priority,omitempty"`
-	Impact      string `json:"impact,omitempty"`
+	Title       string   `json:"title"`
+	Repo        string   `json:"repo,omitempty"`
+	Tags        []string `json:"tags,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Why         string   `json:"why,omitempty"`
+	Deadline    string   `json:"deadline,omitempty"`
+	Estimate    string   `json:"estimate,omitempty"`
+	Priority    string   `json:"priority,omitempty"`
+	Impact      string   `json:"impact,omitempty"`
 }
 
 // QA is one thing the broker asked and what the person answered.
@@ -104,14 +107,14 @@ const system = `You break a large task into atomic tasks for a task tracker.
 
 Answer with JSON and nothing else, shaped:
 {"questions": ["..."], "proposals": [{"title": "...", "description": "...",
-"why": "...", "estimate": "90m", "priority": "low|med|high",
+"why": "...", "estimate": "small|medium|large", "priority": "low|med|high",
 "impact": "low|med|high"}]}
 
 Ask questions only while you genuinely cannot break the task down: return
 questions with no proposals, at most three, each answerable in a sentence.
 Once you have enough, return proposals with no questions. Every proposal is
-one sitting's work with a verb in its title. estimate is a Go duration such as
-45m or 2h30m, or empty. Leave a field empty rather than inventing it.`
+one sitting's work with a verb in its title. estimate is small, medium or
+large, or empty. Leave a field empty rather than inventing it.`
 
 const asking = `You answer questions about somebody's task list. You are given
 the list as JSON. Answer in a few sentences of plain prose, naming tasks by

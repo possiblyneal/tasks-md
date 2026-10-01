@@ -88,7 +88,7 @@ func TestTheAnswersGoBackWithTheNextTurn(t *testing.T) {
 	c := broker(t, func(w http.ResponseWriter, body map[string]any) {
 		out, _ := json.Marshal(body["messages"])
 		sent = string(out)
-		completion(w, `{"proposals":[{"title":"Sand it","estimate":"90m","priority":"med"}]}`)
+		completion(w, `{"proposals":[{"title":"Sand it","estimate":"small","priority":"med"}]}`)
 	})
 
 	step, err := c.Breakdown(context.Background(), Brief{Title: "Paint the shed"},
@@ -102,7 +102,7 @@ func TestTheAnswersGoBackWithTheNextTurn(t *testing.T) {
 	if len(step.Proposals) != 1 || step.Proposals[0].Title != "Sand it" {
 		t.Fatalf("the step came back %+v, want the one proposal", step)
 	}
-	if step.Proposals[0].Estimate != "90m" || step.Proposals[0].Priority != "med" {
+	if step.Proposals[0].Estimate != "small" || step.Proposals[0].Priority != "med" {
 		t.Errorf("the proposal came back %+v, want its attributes", step.Proposals[0])
 	}
 }
