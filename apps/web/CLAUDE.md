@@ -3,660 +3,83 @@
 ## Purpose
 
 The person's surface: a TypeScript browser client, and the only thing a person
-looks at, the TUI and `tasks serve` having been deleted at the stage
-`docs/plans/browser-client.md` set aside for it. It reads the tracker over the
-JSON `tasks api` serves and builds to static files that same process serves
-beside the JSON, so there is no second process and no CORS.
-`docs/adrs/0003-replace-the-tui-with-a-browser-client.md` records why the
-surface moved off the terminal.
+looks at. It reads the tracker over the JSON `tasks api` serves and builds to
+static files that same process serves beside the JSON, so there is no second
+process and no CORS. `docs/adrs/0003-replace-the-tui-with-a-browser-client.md`
+records why the surface moved off the terminal.
 
-What it holds: the list over `GET /api/state` and the controls that narrow and
-order it, the box that hands a dump to the Broker and opens the add sheet
-filled in, over the list and again under a Task where what it writes is a
-Subtask, the detail screen a tap on a Task opens, the Series screen and the
-four things it does to a date, the breakdown that proposes Subtasks, the
-collections screen over the Lists and Tags, and the activity screen over the
-Change History. The six stages of
-`docs/plans/browser-client.md` are all done; work since then is issue by issue
-and adds to this list rather than to the plan.
+What it holds today (#119): the board, six State lanes of leaf-Task cards over
+every Repo, drawn from `GET /api/state` and read only. The box, the add sheet
+and the breakdown are kept unmounted for #123, which brings the Broker routes
+back; writes come with #121 and #122.
 
 ## Ownership
 
 - `src/api.ts` — the fetch plumbing every call shares: one JSON body out and
   one back, and the one place a failed response becomes an Error.
-- `src/state.ts` — the wire shapes and the one call that reads them. It mirrors
-  `apps/tasks/src/api/state.go`, which is the side that decides them. It also
-  holds the Narrowing and the one function that writes it as a query string,
-  which both the list and the question ask under, and `Offered`: the served sets
-  a surface picks from, which is the whole of the state bar the Tasks. The
-  other reads a screen makes for itself are here too: a Task's history, the
-  whole Change History, a Series, and one directory of the machine the listener
-  runs on.
-- `src/write.ts` — the wire shapes the write and Broker routes take, and the
-  calls that reach them, and the client's one copy of the four lifecycle verbs
-  and the three Occurrence marks, plus the fourth thing done to a date, which
-  is a call of its own because it carries a whole Task. It mirrors
-  `apps/tasks/src/api/tasks.go`, `apps/tasks/src/api/series.go`,
-  `apps/tasks/src/api/collections.go` and `apps/tasks/src/api/broker.go`. It also
-  turns a Task read back into the body that edits it, and takes the difference
-  between the memberships a sheet opened on and the ones ticked when it was
-  submitted.
-- `src/read.ts` — the one read a screen makes for itself, and the guard around
-  it: what came back, what went wrong, and the dropping of an answer that
-  arrives after the screen has moved on.
-- `src/rank.ts` — the order the Tags are offered in, and the only thing this
-  client works out that the store did not: the counts are the store's, and what
-  to do with them is a question about looking at a list.
-- `src/log.ts` — what a Change History entry says, worked out without
-  recognising anything by name: the Actor split on the first slash, and which
-  kinds are the Lease bookkeeping rather than activity.
-- `src/Box.tsx` — the box: a dump or a question, in the same field under the
-  same thumb. Neither call writes. It is given a Narrowing or a `parent` and
-  never both: the second makes it a Task's own box, where the same dump is
-  submitted as a Subtask of that Task and there is no Ask, a question being
-  about a list.
-- `src/Sheet.tsx` — the sheet: a Task open for correction, whether the Broker
-  just read it or it already exists. Every attribute a Task has is on it, which
-  is the title, description, why, deadline, estimate, priority, impact, color,
-  the key/value pairs, the pointers collected for it, and the Lists and
-  Tags it is filed under, plus the snooze, which is on an edit alone. It
-  makes one write of its own, the List or Tag its ticks offer to make; every
-  other write is whoever opens it saying what submitting it does.
-- `src/Narrow.tsx` — the controls over the list: the sort, the List, the Tags,
-  and the one toggle that takes in the snoozed, completed and declined,
-  plus `Search`, the box the list is searched in, exported apart from them
-  because it belongs over the Tasks rather than among the filtering. It sets
-  fields on the Narrowing and narrows nothing itself. The List is a picker and
-  the Tags are switches, because one is picked one at a time and the other is a
-  set.
-- `src/Row.tsx` — one row of the list: what the Task is called, two lines of
-  what it says, when it was created, its Deadline, the Lists it is filed under,
-  whether it points anywhere, the tap that opens it, and the press held that
-  puts the four verbs under it. The Tags are not on it: they are the split down
-  the side of the list, which is where a Tag is reached.
-- `src/Series.tsx` — the Series screen: the rule, the dates it produces next,
-  and the four things done to one of them. It works out no date of its own.
-- `src/Breakdown.tsx` — the breakdown screen: the turn with the Broker, the
-  questions it still has, and the proposals ticked by position, each drawing
-  every attribute its tick would write.
-- `src/Detail.tsx` — the detail screen: everything the Task carries, its
-  Subtasks, its Series, its breakdown, the four lifecycle verbs, its pointers
-  added and taken off, and its history. Subtask is a screen holding this Task's
-  own box; Subtask by hand, on the same button row, opens the blank sheet.
-- `src/Attributes.tsx` — the attributes a Task carries, drawn only where it
-  carries one. The detail screen and the historical one both draw through it,
-  so the Task as it stands and the Task as it stood cannot be described
-  differently.
-- `src/Was.tsx` — the Task as one entry left it, read only. It is how a deleted
-  Task is looked at, and it is opened from an entry on either log.
-- `src/Collections.tsx` — the collections screen: the Lists and the Tags
-  created, renamed, recolored and deleted. Both sets are drawn by one component
-  given the path segment, because a List and a Tag are the same three writes.
-- `src/Activity.tsx` — the activity screen: the Change History across every
-  Task, with the filter for Actors that name a harness and a model and the box
-  the log is searched in.
-- `src/Log.tsx` — the entries drawn as who, what and when. Both screens draw
-  their log through it, and both give it somewhere for an entry to open.
-- `src/App.tsx` — the three panes, the poll that fills them, and which screen
-  is open. It draws what the read returned and works nothing out for itself,
-  including how wide the screen is.
+- `src/state.ts` — the wire shapes and the one read the board makes. It mirrors
+  `apps/tasks/src/board/board.go`, which is the side that decides them. It
+  holds the Narrowing and `queryString`, the one function that writes it as a
+  query, plus the types the unmounted sheet still reads (`Offered`,
+  `Collection`, `Level`) and `GET /api/files`'s shapes.
+- `src/write.ts` — the calls the sheet, the box and the breakdown make. No
+  route answers them until #121, #122 and #123; they stay so those components
+  keep compiling and their tests keep their grammar.
+- `src/read.ts` — the guard around a read a screen makes for itself, used by the
+  sheet's file picker.
+- `src/App.tsx` — the board: the poll, the six lanes, the cards, and the
+  problems a Repo's file has. It is what `main.tsx` mounts.
+- `src/Box.tsx`, `src/Sheet.tsx`, `src/Breakdown.tsx` — the dump box, the add
+  sheet and the breakdown, unmounted until #123.
 - `src/main.tsx` — the mount, and nothing else.
-- `src/Box.test.tsx`, `src/Sheet.test.tsx`, `src/Breakdown.test.tsx`, `src/Narrow.test.tsx`,
-  `src/Collections.test.tsx`, `src/Detail.test.tsx`, `src/App.test.tsx`,
-  `src/Row.test.tsx`, `src/Was.test.tsx` — the components with a grammar: what
-  a pick turns into on the wire, which route a dump goes out on, what a
-  proposal draws before it is approved, what a picker does
-  with a value it cannot name and whether its Tag order survives an unmount,
-  which kind a collection write goes out under, whether the field holding a
-  pointer is cleared and what the picker off the host puts in it, that a
-  selected Task and the list it was selected from are drawn from one tree and
-  that the search box over the list goes back to the store, what a row does
-  with a name nothing named and an instant it cannot read, and whether an entry
-  is something to press and what pressing it reads out. The other components are drawn from what they are handed, so there is nothing in
-  them a test would pin that reading them does not.
-- `src/log.test.ts`, `src/state.test.ts`, `src/write.test.ts`,
-  `src/rank.test.ts` — the modules that work something out rather than draw it:
-  how an Actor splits, what a Narrowing becomes as a query, what a write sends,
-  and what the draw does to the Tag order. A module that only holds types or
-  calls `fetch` has nothing to pin and is not listed.
-- `src/index.css` — the whole of the styling, including both media queries and
-  therefore the whole of what decides whether this is three panes or one
-  column. The phone query orders the one column and hides it behind a selected
-  Task; the desk query is what makes the panes columns. There is no
-  component-level stylesheet and no CSS-in-JS, so the 44px rule below is
-  checkable by reading one file.
+- `src/App.test.tsx`, `src/Box.test.tsx`, `src/Sheet.test.tsx`,
+  `src/Breakdown.test.tsx` — the components with a grammar.
+- `src/state.test.ts`, `src/write.test.ts` — what a Narrowing becomes as a
+  query, what a read does with a `304` and a refusal, and what a write sends.
+- `src/index.css` — the whole of the styling. There is no component-level
+  stylesheet and no CSS-in-JS, so the 44px rule below is checkable by reading
+  one file.
 - `index.html`, `vite.config.ts`, `tsconfig.json`, `eslint.config.js` — the
   build. The dev server proxies `/api` so development has the one origin
   production has.
 - `.unit.json` — `ships: none`, because what this unit produces is files
   somebody places rather than a program somebody starts. `npm run build` writes
-  them to `dist/`, and on a host they are copied where `tasks api -web` is
-  pointed; `apps/tasks/deploy/systemd/tasks-api.service` is what points it.
+  them to `dist/`, and `apps/tasks/deploy/systemd/tasks-api.service` points
+  `tasks api -web` at where they are copied.
 
 ## Local Contracts
 
 - **Vite, React, and nothing else.** No router, no data-fetching library, no
-  component kit. A dependency added here is a decision, not a convenience. The
-  two under Verification below are the decision recorded in #49: the sheet's
-  snooze and the pickers' unknown-value rule turn a pick into a different thing
-  on the wire, and an inversion there is a wrong write nobody sees happen.
-- **An Attachment is text, and this surface uploads nothing.** The detail
-  screen and the sheet both send the pointer as typed and draw it as text, a web
-  address and a file path alike: nothing is fetched and nothing is copied in, which is the
-  store's decision from issue #3 rather than a limit of the browser. A path is
-  resolved by whoever runs `tasks api`, so one typed on a phone names a file on
-  that host and not on the phone.
-- **The detail screen's attachment field is cleared by the write landing, never
-  by the tap.** The pointer typed there survives a refusal, because nothing was
-  written and re-tapping is the right thing to do: clearing it would cost the
-  whole target retyped on a phone and would disable the button that retries,
-  since an empty target cannot be submitted. `point` answers whether the write
-  landed and the field reads that answer.
-- **A pointer taken off is tappable until the next poll, and the second tap is
-  an entry that did not happen.** The screen draws the pointers the read
-  returned, so a landed detach leaves the row for up to a second and a second
-  tap appends a second `attachment_removed` against one pointer removed once.
-  The folded state stays right either way. Nothing here filters the read to hide
-  it: a screen keeping which pointers it thinks are gone would be a second
-  description of the store, which is the thing this client does not do, and the
-  window is bounded by the poll rather than open. The fix belongs in the store,
-  where it would hold for every surface and every Actor; issue #77 is that.
-- **The client works nothing out that the store already did.** `Task.marks` is
-  drawn as it arrives; a Task that read as snoozed from a keyboard cannot read
-  as plain here.
-- **`Depth` is 1 for a top-level Task.** `Tasks` comes back depth first, so the
-  list indents by what a Task has beyond the top rather than by `depth` itself.
+  component kit. A dependency added here is a decision, not a convenience.
+- **The client works nothing out that the read already did.** A Task's State
+  (a parent's included), whether it is Blocked, and its parents' titles all
+  arrive with it; the board draws them.
+- **A card is a leaf Task, and a parent is never a card of its own.** Its title
+  rides above each leaf under it, outermost first, which is how a nested Task
+  sits on a flat lane. A card names its Repo, and its edge is the Repo's color.
+- **One board over every Repo.** The lanes are the six States in
+  `state.STATES` order, and every Repo's leaves share them.
+- **A Repo whose file has problems is flagged, line by line.** The problems
+  `tasks lint` reports arrive on the read and are drawn above the lanes; config
+  errors are drawn the same way.
+- **Nothing on the board writes.** No button, field or checkbox; the only
+  request it makes is `GET /api/state`.
 - **A 304 is nothing to redraw, not an empty state.** `fetchState` returns
-  `null` for one and the view keeps what it has; the ETag is handed back on the
-  next poll, which watches the store's write-ahead log over HTTP once a second.
+  `null` for one and the board keeps what it has; the ETag is handed back on
+  the next poll, once a second.
 - **One poll at a time.** The next is scheduled once the one before it has
-  settled rather than on an interval, so two are never in flight together: the
-  slower of an overlapping pair draws its older list over the newer one and
-  leaves a stale ETag to be answered `304` against.
+  settled rather than on an interval, so the slower of an overlapping pair
+  cannot draw an older board over a newer one.
 - **A failed poll takes nothing off the screen.** The error is drawn over the
-  list it interrupted, because a read that failed says nothing about the Tasks
-  already drawn, and a phone that walked out of range gets them back when it
-  walks back rather than losing them on the way out.
+  board it interrupted, and the next poll asks without a tag.
 - **An API error is shown in the API's own words.** The body's sentence is the
   one the CLI would have printed, so it is drawn rather than restated.
-- **The sheet is the gate, and nothing about the Task is written before
-  submit.** Handing a dump over is a read: the Task comes back as a draft, and
-  a draft abandoned leaves nothing behind. Only submitting the sheet calls
-  `POST /api/tasks`. The one write it makes before then is the List or Tag its
-  ticks offer to make, which is a different aggregate and not the Task; the
-  bullet below is where that is argued.
-- **Nothing the Broker said is dropped on the way to a field.** A deadline is
-  submitted as typed and a level that is none of the three is offered as
-  a fourth, because a control that can hold only what it can parse would blank
-  the Broker's answer before anybody saw it. What the API cannot read it says
-  so about, in its own words, with the value still in the field.
-- **A question is asked about the Tasks the read asked for.** `POST /api/ask`
-  narrows by the same query string `GET /api/state` does, so whatever narrows
-  the list narrows the question with it. `queryString` in `state.ts` is what
-  makes that structural rather than a discipline: both calls build the string
-  from the same Narrowing through the same function, and a narrowing added
-  there is on the question the moment it is on the poll.
-- **The sorts on offer are the API's, not a copy.** `GET /api/state` carries
-  `sorts` from `store.Sorts`, so the picker cannot offer one the store would
-  refuse and a fifth sort appears the day it lands. This is the pattern for a
-  set the store owns, and the levels joined it: the verbs and the marks are
-  copied only because no route answers what they are.
-- **The served sets travel as one prop, never as several.** `Offered` bundles
-  the Lists, the Tags, the sorts, the colors, the snoozes, the priorities and
-  the impacts, and `State` is it plus the Tasks. Every component takes `offered`
-  whole, including the three that only hand it on, so a further set the route
-  serves is one field here rather than a prop threaded through them again. **What belongs in it is what the
-  route serves, not what one screen reads.** A set used by both the controls and
-  the sheet would have nowhere to live under a bundle shaped by its consumers,
-  and the wire has one shape whatever reads it; the cost is that `Narrow` and
-  `Sheet` each say which fields are not theirs. `Choice`, `Snooze` and `Picker`
-  name their own list `options` or `all` rather than `offered`, so the served
-  bundle and one control's values are never the same word in one file.
-- **A component reading the wrong set off `Offered` is a mistake a test catches.**
-  Five of the seven fields are lists of strings, which makes `offered.sorts` and
-  `offered.colors` interchangeable to the compiler, so `Narrow.test.tsx` pins
-  which set feeds the sort and `Sheet.test.tsx` pins the color and the snooze.
-  `priorities` and `impacts` are `Level[]` and so cannot be read as either, but
-  they are interchangeable with each other, which is the same mistake with two
-  candidates instead of five.
-- **A changed narrowing restarts the poll from no ETag.** The tag and the list
-  it describes have to be the same age, so `App` keys the polling effect on the
-  query string. The API hashes the query into the tag as well, which means a
-  stale one cannot be answered `304` against a different view even if it were
-  handed back; the two together are belt and braces on the one mistake that
-  would draw one narrowing's Tasks under another's controls.
-- **Narrowing to a List narrows the tree, not just its roots.** The store
-  applies the filter to Subtasks too, so a Task open from a List-narrowed read
-  shows only the Subtasks in that List. That is `store.Tasks` behaving as
-  `tasks list -list` does, and the client draws what it returned rather than
-  reassembling a tree the store did not describe.
-- **Searching is a keystroke and a read, with no timer in between.** Each
-  character is a new narrowing, so the poll restarts and the store answers off
-  one query; a delay here to decide when typing stopped would be a list that
-  lags the box it is searched from. The text goes out as typed, because the
-  store is what matches it and `tasks list -search` matches the same way.
-- **The empty list says which of two things happened.** The List, the Tag and
-  the search are what take Tasks out of a read this client asks for, so a read
-  that came back with nothing under one of the three says the list is narrowed
-  to nothing and otherwise says the store is empty. A sort cannot empty an
-  answer and `all` widens rather than narrows, so neither is asked about. It branches on the narrowing the Tasks
-  on the screen were read under, held in `App.tsx` as `drawn`, not on the one
-  the controls show: the list is left standing through the round trip after a
-  control is touched, so the sentence under an empty one has to name the
-  narrowing that emptied it.
-- **No picker here keeps its own list of what to offer.** The sorts, the
-  colors, the snoozes, the levels and the kinds a log row opens on all arrive
-  with the state, so no picker
-  can miss a value the store offers or go on offering one it dropped. It is the
-  narrower claim on purpose: a picker still offers a value the store would
-  refuse, because a value already on the Task is added to the options below, and
-  the client keeps copies of the verbs, the marks and the Lease kinds, which no
-  route answers.
-  `priorities` and `impacts` are two fields because the three words are the same
-  and what they mean is not, and each level travels beside the example that says
-  what it means. `Choice` puts that example in the option itself: the question
-  it answers is asked while the three are side by side, and showing only the
-  chosen one's would mean picking each in turn to read them. It takes one list
-  of what is on offer and not a list of names beside a list of meanings, since
-  two lists of the same values are two that can disagree; a color goes in as a
-  name with nothing said about it, because blue means blue.
-- **A rename and a recolor are one write, and each carries only what changed.**
-  `Collections.tsx` edits a row's name and color in place and submits them
-  together, because the store writes them as one entry and a screen that sent
-  two would put two rows in the Change History for one correction. The body
-  carries the attribute the row changed and leaves the other absent, which is
-  what `api.collectionBody` reads as leave it alone: sending back the color the
-  row opened on would undo a recolor another Actor made while it sat there.
-  A row nobody touched cannot be saved at all, so no entry says nothing changed.
-  Nothing drawn under a heading is three different things — a read that has not
-  landed, a read that failed, and a store with no Lists in it — and the screen
-  says which: telling somebody their Lists are gone because a poll has not come
-  back is what gets one added twice.
-  The row is keyed on the name and the color it was drawn from as well as the
-  id, because it holds a draft and the screen redraws on the read: a Collection
-  renamed from another surface has to put the row back on the new baseline, or
-  Save lights up on a row nobody touched and sending it writes the old name
-  over theirs. The draft is lost in that case, which is the right way round —
-  the alternative offers to undo somebody else's write without saying so. It
-  also closes the window after a save of one's own to the poll that follows it.
-- **The collections screen says one thing about a refusal and clears the add
-  row either way.** The message belongs to the write somebody just made and
-  there is only ever one of those outstanding, so it sits above the screen
-  rather than on a row. The blank row empties whether or not the write landed,
-  because the refusal is already said in its own words and a name left sitting
-  there is a name added twice by whoever read the sentence and tapped again.
-  That is the opposite of the rule the detail screen's attachment field follows
-  above, and the
-  two screens disagreeing is issue #78 rather than a distinction either one
-  argues for.
-  Deleting is one tap, the way the four verbs on a Task are: the Tasks that
-  carried the Collection survive it and the Change History says it went.
-- **A narrowing to something the client cannot name is kept on the screen.**
-  `Picker` in `Narrow.tsx` draws an id it has no Collection for under the id
-  itself. A List or a Tag deleted from another surface while the list is
-  narrowed to it would otherwise match no option, so the control would render
-  blank over a list that was still narrowed and nothing would say what
-  happened. `Tags` keeps an unnamed id on screen for the same reason: a switch
-  nobody can see is a switch nobody can turn off. The rule has five sites and
-  they stay five: `Picker` and `Tags` here, `Choice` and `Snooze` in
-  `Sheet.tsx` below, and `Color` in `Collections.tsx`, which keeps a color the
-  served nine do not name so that saving a rename cannot clear it. The rule
-  merges nothing: the List and the Tag were one `Picker` and are two controls
-  now, because a List is picked one at a time and a Tag is switched on beside
-  others, so what they let somebody do differs and not only what they are
-  labelled. `Color` and `Choice` are the nearest pair and stay apart: one is
-  a bare control in a row and the other a labelled field in a form, so merging
-  them would mean two props that configure chrome and one file's layout change
-  having to consider the other's. What is duplicated across the five is the rule
-  itself rather than the control, written out at each site because the elements
-  differ, and lifting that one expression out is worth doing on its own rather
-  than inside a feature branch. What `Picker` and `Tags` do share is `labelled`,
-  which is what an option or a switch reads: a Collection the store named
-  carries the count it worked out, and an id nothing named carries none, because
-  a zero there would be this side answering a question the store never answered.
-- **A deadline is typed, and picked beside being typed.** The box is the field
-  and is submitted as typed, which is what keeps a phrase the Broker used from
-  being blanked by a control that can hold only what it can parse. The native
-  `<input type="date">` next to it writes into the box and never reads it:
-  "next Friday" is not a date it can show, and one that guessed at it would be
-  that same failure, only later. It writes a date and never an empty one,
-  because a native date input fires a change carrying `""` when a keystroke
-  clears it, and writing that through would blank the box by the other route.
-  It blanks itself after each pick, since a control left holding the day fires
-  nothing when that same day is picked again, and somebody who typed over a
-  picked date could not pick it back.
-  The two are named apart — the box is "Deadline as typed" and the picker "Pick
-  a deadline" — since one value behind two controls is two things to say.
-- **An Attachment is collected on the sheet and written after the Task exists.**
-  `Pointers` in `Sheet.tsx` puts them on the body; every one of the four writes
-  that sheet makes — `addTask`, `addSubtask`, `editTask` and `detachEdited` in
-  `write.ts` — splits them off, because every write route refuses a field it
-  does not know and `store.Attach` is a guarded write against a Task that may
-  not exist yet. A write added to the sheet and not given the split is a 400 on
-  the whole write, not a dropped pointer. They go one at a time, and a refusal
-  on one leaves the Task and the pointers before it standing; the sentence says
-  so, because the form cannot otherwise tell that from a submit that wrote
-  nothing, and pressing the button again would write a second Task. The field
-  never detaches. A pointer already on the Task is taken off from the detail
-  screen, the only screen that shows what a Task already carries; Remove here
-  drops one collected before anything was sent. The row that collects one is
-  written twice, here and on the detail screen, because the two clear at
-  different moments — the detail screen's on the write landing, this one on the
-  tap, since there is no write to wait for.
-- **The sheet's attachment box is browsed as well as typed into.** The detail
-  screen's box is typed into only; the two are issue #78's third disagreement
-  rather than a distinction either screen argues for. `Machine` in
-  `Sheet.tsx` walks the machine `tasks api` runs on over `GET /api/files`, a
-  directory at a time, and a file tapped fills the box. It fills and never reads
-  back, the rule the deadline's picker follows, and filling is not attaching:
-  Attach is still what collects what is in the box. The browser's own file input
-  is not what this is, and could not be: it answers with a bare filename and no
-  directory, so a file chosen on a phone would be a path the host cannot
-  resolve. A refusal is drawn in the API's own words, because the root it will
-  look no further than is the route's to describe, and it is drawn over the
-  directory it was refused from rather than instead of it: a picker replaced by
-  a sentence has no Up button left to take somebody back. It reads through
-  `useRead` like every other screen that fetches for itself, so the answer that
-  lands after a tap has moved on is dropped in one place rather than two.
-- **A List or a Tag made on the sheet is made then, not on submit.** `Ticks` in
-  `Sheet.tsx` posts it, holds the name until the poll answers with it, and ticks
-  it. A Collection is an aggregate of its own, so the one made here outlives a
-  sheet backed out of and is renamed, recolored and deleted from the
-  collections screen like any other; the row says that on the screen rather
-  than leaving it to be discovered. It is made with a name and no color,
-  because this row is somebody saying which List rather than adding to a
-  catalogue, and the color is put on where the rest of a Collection is edited.
-  The ticks draw over an empty set for this reason, where they used to draw
-  nothing.
-  A refusal is said in the sheet's one message slot and is taken down by the
-  next creation that lands, because the sentence belongs to the write somebody
-  just made and a refusal left standing over a Collection that was made says
-  the wrong thing about the tick beside it. The box keeps the name either way,
-  which is the attachment field's rule rather than the collections screen's: a
-  name typed while the request was in flight is the next one somebody means to
-  make, so the box is cleared by the name going out and not by the answer
-  coming back. That is the third site of the disagreement issue #78 is about.
-- **More than one Tag narrows to any of them, not all of them.**
-  `Narrowing.tags` is a set, sent as `?tag=` repeated, and a Task carrying any
-  one of them is in the list. Turning a second Tag on is somebody widening what
-  they are willing to look at; an intersection would empty the list on the
-  second tap. An id with nothing in it is no Tag named, the way an empty
-  `?list=` is: the store drops it, so a caller that built the query out of a
-  variable nobody set gets the list rather than silence.
-- **The switches are not drawn when the store has no Tags.** There is nothing
-  to narrow by and nothing to say about it, where a `Picker` had `Every tag` to
-  rest on. That is why this one control may draw nothing where the ticks on the
-  sheet draw over an empty set: a tick is a thing being written and an empty
-  one still has to be offered, and a switch is only a way of reading.
-- **A level the client does not know is offered rather than dropped.** `Choice`
-  in `Sheet.tsx` is one control for the levels and the Task's color alike — a
-  Collection's color is `Color` in `Collections.tsx` — and a value that is none
-  of the offered ones is added to the end of the list. That is the levels' case:
-  the Broker answers priority and impact in whatever words it chose, and a
-  picker that silently could not hold one would lose what it said. A color
-  cannot arrive that way — `write.AsSaid` carries no color, and the nine arrive
-  with the state — so for colors the branch is the same code standing idle
-  rather than a case being handled. The API refuses what it refuses, in the
-  sentence the sheet shows.
-- **A Subtask is said the way a Task is.** `Box` is the front door to both:
-  over the list a dump becomes a top-level Task, and under a Task the same
-  sentence, read by the same `POST /api/capture`, becomes a Subtask of it. The
-  `parent` it was given is the whole of the difference, so there is one dump
-  and one gate rather than a second flow for the nested case. That box draws no
-  Ask, because a question is asked about a list and a Task is not one.
-- **A box is the list's or a Task's, and the type is what says which.** `Where`
-  in `Box.tsx` is a Narrowing or a `parent`, never both and never neither: two
-  optional props would have been two switches over one fact, with a box that
-  wrote Subtasks while answering about the list, and a box that wrote top-level
-  Tasks under a Task, both typechecking and neither reachable on purpose. The
-  turn each button takes is handed to `hand` as a function for the same reason —
-  the question is asked only from the button that knows what it is about, so no
-  arm of it has to wonder whether there was a list to ask about.
-- **The blank sheet is reached from the screen before the box, never beside
-  it.** `Detail` puts Subtask by hand in its own button row: on the box screen
-  it would unmount the box and take the sentence somebody had typed with it,
-  and a dump survives everything else. Back is the one other thing on that
-  screen, and leaving is leaving.
-- **The sheet offers a snooze on an edit and never on a create.** Hiding a Task
-  is something done to one that is there, and the three things the control says
-  — leave it alone, wake it, hide it for a span — are two of them nonsense
-  about a Task nobody has written yet. `existing` is what says which, and every
-  call site passes it: `Detail` on an edit alone, `Box` and `Series` never, the
-  second because lifting a date out writes a Task that is not there either.
-  A create drops the snooze on its way out rather than only hiding the control,
-  so what is submitted is what was on the sheet: a draft that arrived carrying
-  one would otherwise be written unseen, which is the gate giving way. The
-  field is absent rather than empty, absent being leave it alone.
-- **Snooze is the one attribute the sheet cannot read back.** A Task carries the
-  instant it wakes and the field takes the span to wait, so the control never
-  opens knowing the answer: leaving it alone and waking the Task cannot be the
-  same option, and they are two. Absent leaves a snoozed Task snoozed through an
-  edit about something else, and waking it is the only way back from a snooze on
-  this surface, since a snoozed Task is reached by showing everything the way an
-  ended one is. It carries the unknown-value fallback for a reason of its own:
-  `write.Snooze` takes a plain duration as well as the four served labels, so a
-  span from a terminal is a value the picker has to show rather than blank.
-- **A key/value pair is removed by emptying it, and a key is never renamed.**
-  The wire names a pair by its key, so what looks like a rename is a removal and
-  an addition; offering it as one edit would be the sheet describing a write the
-  API does not make. Emptying a value is the store's own rule for removing a
-  pair rather than a delete this side invents.
-- **A membership in the draft is on the screen before it is written.** An id
-  the client cannot yet put a name to, which is the window before the first
-  poll lands, is ticked under the id itself rather than hidden, because a
-  membership nobody could untick is a write the sheet did not gate. One made
-  on the sheet is the exception and is drawn under the word that was typed:
-  the id is unrecognisable and this side does know the name, having just sent
-  it, so falling back to the id would be hiding an answer it has.
-- **A dump survives backing out of the sheet.** Somebody who changed their mind
-  about the Task has not changed their mind about having typed the sentence.
-- **The list redraws on the next poll, not on the write.** A write answers with
-  an id and nothing else; the poll a second later is what puts the Task on the
-  screen, so there is one description of the list and it is the read's.
-- **One sheet, and whoever opens it says what submitting it does.** Adding,
-  editing and adding a Subtask are the same ten attributes, so they are one
-  component taking an `onSubmit` rather than three copies of the form. The
-  memberships it submits are the difference between what it opened on and what
-  is ticked now, because ticking and unticking are different fields on the wire
-  and an untick that sent nothing would leave the membership on. `against` is
-  what the sheet takes that difference from where the draft is not it: a route
-  that creates takes the memberships whole, so a create prefilled from a Task
-  passes `{}` and sends the ticked sets rather than an empty difference.
-- **The other screens re-read on the ETag, not on a clock.** `App` hands the
-  poll's tag down as a revision; the detail, Series and activity screens fetch
-  their own read again when it changes. A second poll of their own would be a
-  second clock disagreeing with the first. The tag changes when something was
-  written and also when the narrowing changes, because the API hashes the query
-  into it. The second cannot be observed: the only screen the controls are on is
-  the list, and the three are unmounted while it is. Do not go looking for the
-  cost of it. A store whose write-ahead log cannot be stat'd carries no ETag at
-  all, and then those three read once and never again while the list stays live.
-  That is the one state where they are behind, and it is the same state the API
-  describes as not knowing whether anything changed.
-- **A deleted Task is reached from the log and from nowhere else.** No list
-  read offers one, `?all=true` included, so the toggle takes in three states
-  and not four. `fetchTaskAsOf` is the way to one: `Was` reads
-  `GET /api/tasks/{id}/at/{seq}` and draws the Task as that entry left it,
-  under the entry itself. It is read only — a Task drawn at a position may not
-  be there to be written to — and it draws its attributes through
-  `Attributes.tsx`, the same component the detail screen draws its own
-  through, so the two cannot come to describe one Task differently.
-- **Every entry about a Task opens, not only the ones that deleted
-  something.** `Log` takes an `onOpen` and wraps a row in a button when it is
-  given one, so "what did this say before that edit" is a question either log
-  answers rather than one a reader works out from the kinds. Which kinds are
-  about a Task is not this client's to decide: `offered.opens` is
-  `store.OnTasks` served on `GET /api/state`, and a kind outside it names a
-  List, a Tag or a Series, so pressing one could only ask for a Task by an id
-  no Task has. Without `onOpen`, or before the first read fills `opens`, the
-  rows are not buttons: a row that looked pressable and 404'd would be worse
-  than a row that does not. The entry opened is kept whole rather than as a
-  `seq`, because the screen draws what happened above the Task and the entry is
-  what says it.
-- **The log is searched by the route, never by the page in hand.** The activity
-  screen reaches further back by asking for more, so a match made against what
-  has already arrived could only find what was recent enough to be on it, and a
-  Task deleted a month ago is the thing somebody comes here to find. The text
-  goes out as `?search=` and the read restarts on it, the same keystroke-to-read
-  rule the list's search box follows.
-- **A verb is offered whatever state the Task is in.** Which of the four the
-  store refuses is the store's to say, and it says it in a sentence: a screen
-  that greyed the verb out would be a second copy of a rule that already
-  exists, and would be wrong the day the store's answer changed. Reopen is
-  reached through show everything: the everyday poll asks for the open Tasks,
-  so an ended one is in the list to be tapped only under `?all=true`. A
-  deleted Task is not there under either, and reopening one is refused
-  anyway.
-- **The four verbs are the first thing the client keeps a copy of.**
-  `write.VERBS` names them because no route answers what they are, and both the
-  row and the detail screen read that one list. A fifth added to
-  `write.Lifecycle` has to be added here too, and until it is, the button is
-  missing rather than a wrong sentence being drawn.
-- **A press held on a row is what hover and a right click would have been.**
-  Half a second, cancelled by a thumb that travels, and the click the browser
-  sends afterwards is swallowed so one press does one thing. The refusal is
-  drawn under the row it is about, because the row is where it was asked for.
-- **The activity screen reaches further back by asking for more, not by
-  stitching.** Show more raises the limit and re-reads, so a write that landed
-  in between cannot appear twice. The button is there while the route filled
-  the page it asked for, which is the only thing that says there may be more:
-  what is drawn is smaller, since the Lease bookkeeping comes out client-side.
-  The route's own cap is the client's second copy of something, in `state.ts`:
-  nothing on the wire says where the route stops, and a button that asked past
-  it would offer more and then produce none.
-- **A verb that landed goes back to the list.** Three of the four take the Task
-  out of the read the poll asks for, so the screen would be drawing a Task the
-  next read does not describe. The list is where what happened is said, which
-  is the same rule as a write redrawing on the poll rather than on itself.
-- **A screen belongs to the Task it was opened on.** `Detail` is keyed on the
-  id, so opening a Subtask from inside one starts a screen of its own: a log,
-  an error and an open sheet are about one Task, and carrying them across would
-  draw one Task's refusal over another's title.
-- **The sheet diffs against what the Task carried when it opened.** The draft
-  it is handed is recomputed from every poll, so the baseline is kept once at
-  mount; diffing against a moving one would let a membership another Actor
-  changed turn an untick into no change at all.
-- **Lease bookkeeping is the one kind the client names.** `log.ts` lists
-  `lease_taken`, `lease_released` and `lease_broken`, because the activity
-  screen is two thirds plumbing without dropping them. Everything else about an
-  entry is drawn in the store's own words: a kind is its name with the
-  underscores taken out, so a kind added to the store appears the day it is
-  appended and this client cannot describe one wrongly.
-- **The activity filter narrows and never hides.** The screen opens unfiltered
-  and the filter is a toggle, so an Agent that named itself with no slash, one
-  run with no `TASKS_ACTOR`, is in the view it opens on.
-- **The Series is set as one value and the screen keeps no draft of it.** The
-  rule is typed whole, for the reason a deadline's box is: a control offering the
-  rules it could build would offer fewer than the parser accepts. The field
-  starts empty against the rule drawn beside it rather than seeded from a read
-  that moves under it on every poll, so `Replace` is a rule stated in full and
-  never half of two. Stopping is its own button, because `DELETE` is what takes
-  a rule off and an empty field is a refusal.
-- **The three marks are the client's third copy of something.**
-  `write.MARKS` names tick, skip and detach because no route answers what they
-  are, the same as `write.VERBS`. All three are offered on every date; which of
-  them the store refuses on a date already marked is the store's to say, and it
-  says it in a sentence.
-- **Lifting a date out corrected is the fourth button and not a fourth mark.**
-  It opens the same sheet everything else does, on what the date would become,
-  and writes nothing until it is submitted: a date backed out of is still an
-  Occurrence, which is what makes it different from detaching and then editing
-  what came back. The draft is the Task with that date as its deadline, which
-  restates `store.Detached` and is the one thing this screen works out; the
-  store is what writes it, and one refusal leaves no half-detached date behind.
-  The sheet needs the Lists and Tags, which is why the detail screen hands them
-  down to this screen as well as opening its own.
-- **A failed first read draws no Series at all.** `useRead` holds `NONE` until
-  an answer replaces it, so drawing `NONE` under the error sentence would say
-  the Task does not repeat when all that happened is that nobody could find
-  out. The screen tells the two apart by `NONE`'s own identity rather than by a
-  second piece of state, because no answer is ever that object.
-- **A detached date is followed, because nothing else afterwards names it.** The
-  mark answers the id of the Task the date became and the screen opens it. Tick
-  and skip answer the Task they were against, which is the screen already open,
-  and nothing moves.
-- **The breakdown holds its own conversation and writes nothing until it is
-  approved.** Every turn carries everything already asked and answered, because
-  the Broker keeps nothing between calls. Approving is one `addSubtask` per
-  ticked proposal: there is no Lease over a browser's think time, so a tree that
-  moved while the proposals were being read is what an add sheet left open
-  already risks.
-- **Proposals are ticked by position and never by title.** Two can come back
-  saying the same thing and only the order tells them apart, so `approved` holds
-  indices; everything starts ticked and unticking one is how it is declined,
-  because a turn that proposed nothing worth keeping is the rarer answer. A
-  breakdown backed out of leaves nothing behind, the same gate the sheet is for
-  a dump. Each proposal that
-  lands is unticked before the next is tried, so a refusal partway through
-  leaves the button offering only what did not land: nothing stops the store
-  writing a Subtask that says what another one says, so a second press on the
-  whole list would write the landed ones twice.
-- **Proposals win over questions when a turn carries both.**
-  `POST /api/breakdown` carries both whole and ranks neither, so the order is
-  this screen's to choose: the two are alternatives, and a turn carrying both is
-  the Broker having answered oddly rather than having asked something. Taking
-  the questions first would throw the proposals away and ask again for what was
-  already proposed.
-- **A proposal draws every attribute approving it would write, unparsed.**
-  `Breakdown.tsx` shows the title, description, why, estimate, priority and
-  impact, which are the six `Proposal` admits and the six `ai.Proposal`
-  carries: a tick over an attribute nobody was shown is not a gate, so the
-  type is narrowed from `TaskBody` rather than left wide and trusted. A level
-  that is none of the three is drawn as the word the Broker used, and the
-  store refuses it in its own sentence rather than this screen dropping it.
-  The description is drawn whole: the two-line clip is the list row's, a row
-  being a way of finding a Task rather than of reading one, so the type is on
-  `.lines` and the clip on the row's own. The estimate is labelled alongside
-  the two levels, because `30m` beside `Priority high` reads as much like a
-  deadline as like an estimate; the line holding the three is not drawn at all
-  when the Broker answered none of them.
-- **The Tags are ranked for discovery, and the draw is once per Tag.**
-  Efraimidis-Spirakis weighted sampling over `count + 1`, so a Tag carried
-  twice usually sits above one carried once and sometimes sits below it. The
-  keys live in `rank.ts` for as long as the page is loaded rather than in the
-  controls that read them: `Narrow` is unmounted whenever another screen is
-  open, and an order redrawn on the way back would move a Tag out from under
-  whoever went to fetch something. The Lists are not ranked — there are few of
-  them, and a stable order is what makes one easy to reach.
-- **A paperclip is the row's own count, not a mark the store keeps.**
-  `store.Task.Marks` is the store's vocabulary for what a Task _is_, and
-  holding a pointer is not a state it is in. The row reads
-  `attachments.length` instead, which is the one thing it works out — and it
-  works it out from what the read already carried rather than asking.
-- **Two lines of description is CSS, never a count of characters.** `line-clamp`
-  in `index.css` is what clips it. A truncation computed in the component would
-  be guessing at a width it cannot see, and would guess wrong on every screen
-  but the one it was written against.
-- **A date on a row is drawn as the day it falls on where the reader is, or as
-  it came.** `Row.tsx` formats through `toLocaleDateString`, and a string no
-  date can be read out of is drawn verbatim — the same rule the pickers follow
-  for a value they cannot name. It is the row's rule and not yet the surface's:
-  `Detail.tsx` still draws `createdAt` and `deadline` as the wire sent them,
-  which is issue #79 rather than a distinction either screen argues for.
-- **A filing is drawn by `state.nameOf`, and keyed on the id.** One lookup for
-  the three screens that draw one, so they cannot disagree about what an id
-  nothing named looks like. The spans are keyed on the id because nothing makes
-  a List name unique and the fallback is the id itself, so a name is not unique
-  twice over.
-- **Three panes at a desk, one column on a phone, and one component tree for
-  both.** `index.css` is the whole of the difference: nothing measures a width
-  here, and the same elements are rendered at every size. The panes are the
-  filtering, the middle one holding `Box` with the search box and the Tasks
-  under it, and the Task that is selected. The panes are written filtering
-  first because that is the desk order; on a phone the middle pane stops being
-  a box of its own so the column can put `Box` ahead of the filtering, which is
-  where the front door belongs. Activity and the collections screen are not panes — they are what is
-  on the screen instead of the three, at every width.
-- **Selecting a Task and opening it are one state.** A tap sets the screen to
-  that Task, and the layout decides whether its pane sits beside the list or
-  instead of it; a second piece of state for "selected" would be two things to
-  keep in step over one tap. The pane reads until somebody taps Edit, because it
-  is `Detail` and not `Sheet`. A Task the read stops naming leaves the pane
-  saying so rather than emptying the screen.
+- **A question is asked about the Tasks the read asked for.** `ask` and
+  `fetchState` both build their query from a Narrowing through `queryString`,
+  so a narrowing added there is on both.
 - **Touch targets no smaller than 44px, one thumb, no hover — at every width.**
-  A pointer is not assumed at a desk any more than on a phone, so nothing is
-  reachable only by hovering over it and nothing shrinks below the floor
-  because there is a mouse.
+  The lanes scroll across and snap one at a time, so a phone shows one lane and
+  most of the next.
 
 ## Work Guidance
 
@@ -668,6 +91,8 @@ and adds to this list rather than to the plan.
   unrun and reports `unavailable`, which fails the gate.
 - No `public/`: `scripts/structure` reads a folder under a unit that is neither
   `src/` nor a scoped folder as a domain and requires a `src/` inside it.
+- The screens #119 deleted (detail, Series, collections, activity, the log) are
+  in git history for #120 and #122 to recover from.
 
 ## Verification
 
@@ -676,13 +101,12 @@ the repository root, or `scripts/check` for the gate CI runs.
 
 `environment: 'node'` is the default, and the modules that talk to the API are
 tested under it. A component test opts into a DOM with a
-`// @vitest-environment jsdom` docblock at the top of its file, so the default
-stays the cheaper one and a pure-function test cannot reach a DOM by accident.
+`// @vitest-environment jsdom` docblock at the top of its file.
 
 `jsdom` and `@testing-library/react` are the only two devDependencies here that
 exist for the tests. `@testing-library/user-event` and `jest-dom` are
 deliberately absent: `fireEvent` and plain `expect` cover what these tests
-assert, and the two-dependency floor above is what keeps that a decision.
+assert.
 
 ## Child Index
 

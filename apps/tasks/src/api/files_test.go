@@ -16,7 +16,7 @@ func browsed(t *testing.T, root, query string) *httptest.ResponseRecorder {
 	t.Helper()
 	r := httptest.NewRequest(http.MethodGet, "/api/files"+query, nil)
 	w := httptest.NewRecorder()
-	Handler(openTemp(t), Options{Browse: root}).ServeHTTP(w, r)
+	Handler(Options{Browse: root}).ServeHTTP(w, r)
 	return w
 }
 

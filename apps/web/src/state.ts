@@ -1,208 +1,123 @@
 // The wire shapes `GET /api/state` answers with, and the one call that reads
-// it. They mirror src/api/state.go rather than store.Task: the API decides what
-// a Task looks like on the wire, and this is the other side of that decision.
+// it. They mirror `apps/tasks/src/board/board.go`, which is the side that
+// decides them: `tasks list -json` prints the same shape.
 
 import { refused } from './api'
 
-export type Collection = {
-  id: string
-  name: string
-  color: string
-  count: number
-}
+/** One of the six, as the word on a title line writes it. */
+export type State =
+  'inbox' | 'backlog' | 'doing' | 'deferred' | 'done' | 'declined'
+
+/** The six, in the order the board draws its lanes. */
+export const STATES: State[] = [
+  'inbox',
+  'backlog',
+  'doing',
+  'deferred',
+  'done',
+  'declined',
+]
+
+/** One `- label: value` line under a title, other than `id` and `created`. */
+export type Attr = { label: string; value: string }
 
 /**
- * A Collection by name, where the last read named it. An id nothing named
- * reads as itself rather than dropping out, for the reason the sheet ticks
- * one: a membership nobody can see is one nobody can take off. Every screen
- * drawing a filing goes through here, so the three of them cannot disagree
- * about what an unnamed id looks like.
+ * One Task as the read gives it: flat, in file order, carrying where it sits
+ * in its tree and what the read worked out. `state` is the State that counts,
+ * the checkbox over the word and a parent's worked out from its Subtasks, so
+ * the client draws it and never works it out again.
  */
-export function nameOf(all: Collection[], id: string): string {
-  return all.find((one) => one.id === id)?.name ?? id
-}
-
 export type Task = {
   id: string
-  parent?: string
-  depth: number
   title: string
-  description?: string
-  why?: string
-  color?: string
-  createdAt: string
-  deadline?: string
-  snoozedUntil?: string
-  completedAt?: string
-  declinedAt?: string
-  deletedAt?: string
-  estimateSeconds?: number
-  priority?: string
-  impact?: string
-  lists?: string[]
-  tags?: string[]
-  attachments?: string[]
-  fields?: Record<string, string>
-  series?: string
-  // What the read worked out, in the store's own words. The client draws them
-  // and does not recompute them: a Task that reads as snoozed here and plain in
-  // a verb would be the same Task described two ways.
-  marks: string[]
+  state: State
+  tags: string[]
+  created: string
+  attrs: Attr[]
+  description: string
+  line: number
+  depth: number
+  parent: string
+  /** Every title above this Task, outermost first. */
+  parents: string[]
+  leaf: boolean
+  blocked: boolean
 }
 
-/**
- * Everything `GET /api/state` offers a surface to pick from, which is the whole
- * of the state bar the Tasks themselves.
- *
- * It is one type because the sets travel together everywhere: `App` hands it to
- * the box, the controls and the detail screen, and the box, the detail screen
- * and the Series screen hand it on to the sheet without reading it. Four props
- * through three components that never look at them is a fifth prop the day the
- * route serves a fifth set; a field here is the whole of that change instead.
- *
- * Nothing in it is ever the client's own list. Each set is what the store
- * refuses against, so a picker built from one cannot offer a value the store
- * would turn away.
- */
-export type Offered = {
-  lists: Collection[]
-  tags: Collection[]
-  // What `?sort=` accepts, in the order the store lists them. It is drawn as
-  // it arrives: a sort added to `store.Sorts` is in the picker the day it
-  // lands, and this client cannot offer one the store would refuse.
-  sorts: string[]
-  // The nine colors a Task may carry, by name, and the four offered snoozes,
-  // by label. Both are here for the reason the sorts are: the store refuses a
-  // color that is not one of the nine, so a client keeping its own list would
-  // offer a tenth the day one is added on the other side and not on this one.
-  // A snooze is not confined to the four, which is why the sheet takes what
-  // the Broker said as well as what is offered here.
-  colors: string[]
-  snoozes: string[]
-  // The three levels twice over, each beside the example that says what it
-  // means. Two fields and not one because the words are the same and what they
-  // mean is not: high priority is today, high impact is what unblocks other
-  // work. The examples are why these are served at all — they are what makes
-  // the three words mean the same thing to a person and to an Agent, and a
-  // client keeping the words alone would keep none of it.
-  priorities: Level[]
-  impacts: Level[]
-  // The kinds of Change History entry whose subject is a Task, from
-  // `store.OnTasks`. A log row is a door to the Task as that entry left it,
-  // and the ones not in here have no Task to open: a List Created names the
-  // List. Served for the reason the rest are -- a kind added on the other side
-  // is drawn correctly here the day it lands, and this client never decides
-  // what a kind is about.
-  opens: string[]
-}
+/** One thing wrong with a Repo's tasks.md, at the line it is on. */
+export type Problem = { line: number; message: string }
 
-/** One of the three, and what choosing it means. */
-export type Level = {
+/** One Repo's read. Any problem flags the Repo wherever it is drawn. */
+export type Repo = {
   name: string
-  example: string
-}
-
-/**
- * Nothing on offer, which is the window before the first read lands. The
- * controls are drawn in it, because they are what asks for a list and a screen
- * waiting for one before offering them would be waiting on itself.
- */
-export const OFFERED_NOTHING: Offered = {
-  lists: [],
-  tags: [],
-  sorts: [],
-  colors: [],
-  snoozes: [],
-  priorities: [],
-  impacts: [],
-  opens: [],
-}
-
-export type State = Offered & {
+  path: string
+  color: string
   tasks: Task[]
+  problems: Problem[]
+}
+
+/** A whole read: every Repo, and what was wrong with the config. */
+export type Board = {
+  repos: Repo[]
+  errors: string[]
 }
 
 /**
- * The narrowings `GET /api/state` accepts, as the screen holds them. `all` is
- * the store's own word for it: one flag that takes in the snoozed, the
- * completed and the declined together, because that is what the route does
- * with it rather than three switches this side pretends to. The deleted are
- * not among them and no list read offers them; `fetchTaskAsOf` is how one is
- * looked at.
- *
- * `list` and `tags` are ids rather than names, because that is what a Task
- * carries. `search` is text, matched by the store against a Task's own words.
- *
- * `tags` is a set where `list` is one value: a Task is filed in a List and
- * that is where it lives, where a Task carries Tags and somebody clicking a
- * second one is widening what they are willing to look at. The store takes any
- * of them rather than all of them for the same reason.
+ * The narrowings `GET /api/state` accepts, under the names `tasks list` takes
+ * its flags under. Several States or several Tags widen within the field: a
+ * Task in any one of them is in.
  */
 export type Narrowing = {
-  all: boolean
-  list: string
+  repo: string
+  states: State[]
   tags: string[]
   search: string
-  sort: string
+  unblocked: boolean
 }
 
-/** Narrowed by nothing, which is the everyday view and what the list opens on. */
+/** Narrowed by nothing: every Task in every Repo. */
 export const WIDE: Narrowing = {
-  all: false,
-  list: '',
+  repo: '',
+  states: [],
   tags: [],
   search: '',
-  sort: '',
+  unblocked: false,
 }
 
 /**
- * A Narrowing as the query string both the list and the question carry.
- *
- * It is one function because it has to be one string: `POST /api/ask` reads
- * the query the same way `GET /api/state` does, so whatever narrows the list
- * narrows the question with it. Building the two separately is how they come
- * to disagree, and a question answered about a list nobody is looking at is
- * wrong in a way nothing on the screen would show.
- *
- * An empty value is left out rather than sent empty, so the everyday view is
- * the bare path and the ETag it is cached under does not change shape.
+ * A Narrowing as the query string the read carries. An empty value is left
+ * out rather than sent empty, so the wide view is the bare path. A set is the
+ * parameter repeated, which is how the route reads it.
  */
 export function queryString({
-  all,
-  list,
+  repo,
+  states,
   tags,
   search,
-  sort,
+  unblocked,
 }: Narrowing): string {
   const query = new URLSearchParams()
-  if (all) query.set('all', 'true')
-  if (list) query.set('list', list)
-  // Repeated, not joined: `?tag=a&tag=b` is a set of values in a query string,
-  // and the route reads it that way. A separator here would be one this side
-  // invented and one no tag id could then contain.
+  if (repo) query.set('repo', repo)
+  for (const state of states) query.append('state', state)
   for (const tag of tags) query.append('tag', tag)
   if (search) query.set('search', search)
-  if (sort) query.set('sort', sort)
+  if (unblocked) query.set('unblocked', 'true')
   const written = query.toString()
   return written ? `?${written}` : ''
 }
 
 export type Snapshot = {
   etag: string | null
-  state: State
+  board: Board
 }
 
 /**
- * Reads the whole screen in one request. The ETag is handed back on the next
- * call so an unchanged store answers 304 with no body, which is what makes
- * polling once a second cheap.
+ * Reads the whole board in one request. The ETag is handed back on the next
+ * call so files that have not changed answer 304 with no body, which is what
+ * makes polling once a second cheap.
  *
  * A `null` return is "nothing changed", which is not the same as an empty
- * state and must not redraw as one.
- *
- * The ETag the API answers with is hashed over the query as well as the
- * store's log, so a narrowing changed with no write in between is a different
- * representation and is answered in full rather than 304.
+ * board and must not redraw as one.
  */
 export async function fetchState(
   narrowing: Narrowing,
@@ -222,106 +137,46 @@ export async function fetchState(
 
   return {
     etag: response.headers.get('ETag'),
-    state: (await response.json()) as State,
+    board: (await response.json()) as Board,
   }
 }
 
-/**
- * One appended fact, as `GET /api/history` and `GET /api/tasks/{id}/history`
- * answer it. The Actor is verbatim: the API recognises no model by name and
- * neither does this, which is why the splitting is `log.ts`'s and not a shape
- * the wire carries.
- */
-export type Entry = {
-  seq: number
-  at: string
-  actor: string
-  kind: string
-  subject: string
-  payload?: unknown
+// What the sheet, which nothing mounts until #123, picks from. No route serves
+// these now; the sheet is kept so that work starts from it.
+
+export type Collection = {
+  id: string
+  name: string
+  color: string
+  count: number
 }
 
-/** What the Change History holds about one Task, newest first. */
-export async function fetchTaskHistory(id: string): Promise<Entry[]> {
-  return await read(`/api/tasks/${encodeURIComponent(id)}/history`)
+/** Everything the sheet offers to pick from. */
+export type Offered = {
+  lists: Collection[]
+  tags: Collection[]
+  sorts: string[]
+  colors: string[]
+  snoozes: string[]
+  priorities: Level[]
+  impacts: Level[]
 }
 
-/**
- * The most entries `GET /api/history` will answer, whatever is asked for. It is
- * `api.historyLimit`, and this is the client's copy of it: nothing on the wire
- * says where the route stops, so asking past it would be a screen offering more
- * and then not producing any. Raising it there means raising it here.
- */
-export const HISTORY_CAP = 1000
-
-/**
- * The same rows across every Task, newest first and a page at a time. The page
- * is generous because the screen drops the Lease bookkeeping out of it, and a
- * page counted before that happens is mostly plumbing.
- */
-export async function fetchHistory(limit = 200, search = ''): Promise<Entry[]> {
-  const asked = new URLSearchParams({
-    limit: String(Math.min(limit, HISTORY_CAP)),
-  })
-  // The store is what matches, the same way it matches the search over the
-  // list. A screen reaches further back by asking for more entries, so a
-  // screen that matched the page it already held could only find what was
-  // recent enough to have arrived -- and a Task deleted a month ago is the
-  // thing somebody comes to this log to find.
-  if (search !== '') asked.set('search', search)
-  return await read(`/api/history?${asked}`)
+/** One of the three levels, and what choosing it means. */
+export type Level = {
+  name: string
+  example: string
 }
 
-/**
- * The Task as it stood when one entry was appended. It is how a deleted Task
- * is looked at: no list read offers one, and the entry that deleted it is
- * where what it said is still written down.
- *
- * It answers about any entry and not only a deletion, so "what did this say
- * before that edit" has an answer too. A position before the Task existed is
- * `404`, which is a real answer rather than an empty Task.
- */
-export async function fetchTaskAsOf(id: string, seq: number): Promise<Task> {
-  const response = await fetch(`/api/tasks/${encodeURIComponent(id)}/at/${seq}`)
-  if (!response.ok) throw await refused(response)
-  return (await response.json()) as Task
-}
-
-async function read(path: string): Promise<Entry[]> {
-  const response = await fetch(path)
-  if (!response.ok) throw await refused(response)
-  const body = (await response.json()) as { entries: Entry[] }
-  return body.entries
-}
-
-/**
- * A Task's Series: the rule as the store wrote it back, and the dates it
- * produces next with what anybody has done to each. `apps/tasks/src/api/series.go`
- * is the side that decides the shape.
- *
- * A Task that does not repeat answers `repeats: false` and no dates, which is
- * most of them and is not an error.
- */
-export type Series = {
-  repeats: boolean
-  rule?: string
-  occurrences: Occurrence[]
-}
-
-/** One date of a Series, and the store's own word for what was done to it. */
-export type Occurrence = {
-  date: string
-  state?: string
-}
-
-/**
- * Reads one Task's Series. The dates are computed as they are answered, so
- * asking again on every revision costs the log nothing.
- */
-export async function fetchSeries(id: string): Promise<Series> {
-  const response = await fetch(`/api/tasks/${encodeURIComponent(id)}/series`)
-  if (!response.ok) throw await refused(response)
-  return (await response.json()) as Series
+/** Nothing on offer. */
+export const OFFERED_NOTHING: Offered = {
+  lists: [],
+  tags: [],
+  sorts: [],
+  colors: [],
+  snoozes: [],
+  priorities: [],
+  impacts: [],
 }
 
 /**

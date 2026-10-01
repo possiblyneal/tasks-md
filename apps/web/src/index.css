@@ -26,24 +26,6 @@ body {
   border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
 }
 
-/* The title, with the marks pushed to the end of the same line. */
-.said {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-/* One line, with the rest of a long title ellipsed. The `overflow: hidden` is
-   what `text-overflow` clips against, and it is also what lets the box narrow
-   at all: a flex item's automatic minimum is its content, except that an
-   overflow other than `visible` takes it to zero. So this needs no
-   `min-width: 0` beside it, and adding one would read as though it did. */
-.titled {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* What a Task says, in smaller and dimmer type than its title. */
 .lines {
   overflow-wrap: anywhere;
@@ -51,24 +33,9 @@ body {
   font-size: 0.85rem;
 }
 
-/* Two lines of it and then clipped, in a row and nowhere else: a row is a way
-   of finding the Task rather than of reading it, and the whole of it is a tap
-   away. Everywhere else the words are there to be read before something is
-   decided on them, and half of a description is worse than none.
-   `line-clamp` is what clips it; the `-webkit-` pair beside it is the same
-   property under the name every browser still requires to honour it. */
-button.row .lines {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  line-clamp: 2;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-}
-
-/* When it was created, its Deadline, the Lists it is filed under, and the
-   clip. They wrap rather than shrink, the way the controls above the list do.
-   Wrapping is between them, so a single long one — an unspaced List name, or
-   an instant `day` could not read — breaks inside itself as well. */
+/* The small facts under a title: a card's Repo, Tags, Deadline and whether it
+   is Blocked. They wrap rather than shrink, and a single long one breaks
+   inside itself as well. */
 .facts {
   display: flex;
   flex-wrap: wrap;
@@ -76,32 +43,6 @@ button.row .lines {
   gap: 0.15rem 0.6rem;
   opacity: 0.6;
   font-size: 0.75rem;
-}
-
-/* A row is a tap that opens the Task, so it is a button: the tap target is the
-   whole row rather than the words in it, and a keyboard reaches it.
-
-   It stacks what it says rather than sitting on one line: the title across the
-   top, then the description, then the facts. Still one tap target, and taller
-   than 44px rather than shorter. */
-button.row {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.15rem;
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
-  /* A press held on a row opens its verbs, and selecting the title instead is
-     the platform's idea of what holding means rather than this one's. */
-  user-select: none;
-  -webkit-user-select: none;
-  width: 100%;
-  border-left: 0;
-  border-right: 0;
-  border-top: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
 }
 
 .marks {
@@ -145,47 +86,6 @@ button.row {
 .answer {
   margin: 0.75rem 0 0;
   white-space: pre-wrap;
-}
-
-/* The controls over the list. Three across a phone would take each one under
-   the 44px floor, so they wrap instead of shrinking, and each keeps its own
-   height rather than inheriting the row's. */
-.narrow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
-}
-
-.control {
-  flex: 1 1 8rem;
-  min-height: 44px;
-  padding: 0.5rem;
-  font: inherit;
-}
-
-/* The Tags, each a switch. They take a line of their own below the rest of the
-   controls because there may be many and they wrap; a Tag is a word and does
-   not want the 8rem the pickers beside it claim. */
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  flex-basis: 100%;
-}
-
-.tags .control {
-  flex: 0 0 auto;
-  padding: 0.5rem 0.75rem;
-}
-
-/* Show everything is a toggle, and there is no hover to say which way it is
-   set, so it is filled in when it is on. aria-pressed says it to a reader.
-   The Tag switches are the same, and read the same way. */
-.control.on {
-  background: currentColor;
-  color: Canvas;
 }
 
 /* The add sheet: what the broker read, open for correction. */
@@ -256,8 +156,8 @@ button.row {
   overflow-wrap: anywhere;
 }
 
-/* The detail and activity screens. Both are a column of a phone's width with
-   nothing beside it, which is what one thumb has room for. */
+/* The breakdown screen: a column of a phone's width with nothing beside it,
+   which is what one thumb has room for. */
 .detail {
   padding: 0.75rem 1rem;
 }
@@ -271,120 +171,6 @@ button.row {
   font-size: 1rem;
   margin: 1.5rem 0 0.5rem;
   opacity: 0.7;
-}
-
-.carried {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.25rem 0.75rem;
-  margin: 0.75rem 0 0;
-}
-
-.carried dt {
-  font-size: 0.8rem;
-  opacity: 0.7;
-}
-
-.carried dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.log {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.entry {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.5rem;
-  min-height: 44px;
-  padding: 0.25rem 0;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
-}
-
-/* An entry that opens the Task it is about. It is a button because pressing it
-   is what it is, and it is drawn as the row rather than as a control: the log
-   is a record to read down, and forty buttons in a column would read as a
-   menu. The target is the whole row and not a word in it, so it carries the
-   44px itself: the row's own 44px is the row's, and a flex child laid out on
-   its baseline is as tall as its text rather than as tall as what holds it. */
-.entry-open {
-  display: flex;
-  flex: 1;
-  flex-wrap: wrap;
-  align-items: baseline;
-  align-content: center;
-  gap: 0.5rem;
-  min-height: 44px;
-  padding: 0;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-.entry-open:hover,
-.entry-open:focus-visible {
-  text-decoration: underline;
-}
-
-.did {
-  font-variant: small-caps;
-}
-
-.about {
-  opacity: 0.8;
-}
-
-.who {
-  margin-left: auto;
-}
-
-/* The harness an Agent ran under, beside the model it was. The two halves are
-   drawn apart so the log says which agent a model was acting as. */
-.harness {
-  opacity: 0.6;
-  font-size: 0.8rem;
-}
-
-.when {
-  opacity: 0.6;
-  font-size: 0.8rem;
-  width: 100%;
-}
-
-/* The verbs a press held on a row opens, under the row they are about. They
-   wrap rather than shrink: five across a phone is under the 44px floor. */
-.verbs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-}
-
-.verbs button {
-  flex: 1 0 30%;
-  min-height: 44px;
-  font: inherit;
-}
-
-/* One date of a Series: the date, what was done to it, and the three marks.
-   It wraps rather than shrinks, because three buttons and a date across a
-   phone would otherwise take the buttons under the 44px floor. */
-.date {
-  flex-wrap: wrap;
-  padding: 0.5rem 1rem;
-}
-
-.date .buttons {
-  flex: 1 1 100%;
-  margin-top: 0;
 }
 
 /* A remark beside a control rather than a thing to act on: what the control
@@ -402,100 +188,82 @@ button.row {
   overflow-wrap: anywhere;
 }
 
-/* Three panes at a desk, one column on a phone, and one component tree for
-   both. Nothing measures a width in JavaScript: what is on the screen is the
-   same elements at every size, and this is the whole of what decides the shape.
+/* The board: six State lanes side by side, scrolled across with one thumb and
+   snapping to a lane, so a phone shows one lane and most of the next. */
+.board {
+  padding: 0.5rem 0;
+}
 
-   The panes are filtering, the Tasks with the search over them, and the Task
-   that is selected. A Task is selected by tapping it, once, and the selection
-   is what both layouts draw. */
-.panes {
+.problems {
+  margin: 0 1rem 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  font-size: 0.85rem;
+}
+
+.problems h2 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.problems ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.lanes {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0 1rem 1rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+
+.lane {
+  flex: 0 0 min(85vw, 18rem);
+  scroll-snap-align: start;
   display: flex;
   flex-direction: column;
+  gap: 0.5rem;
 }
 
-.pane {
-  min-width: 0;
+.lane h2 {
+  margin: 0;
+  font-size: 1rem;
 }
 
-/* On a phone the selected Task is shown instead of the list rather than beside
-   it: a third of a phone is not a pane. `Detail`'s own Back is what clears the
-   selection, which is the same button at both widths.
-
-   One column puts the panes in the order they are written, which would stack
-   the filtering in front of the box. The box is the front door and a dump is
-   the most frequent thing anybody does here, so the middle pane gives up being
-   a box of its own and the column orders its children directly: the box, then
-   the filtering, then the list the filtering is about. At a desk the panes are
-   columns and none of this applies. */
-@media (max-width: 59.99rem) {
-  .panes > .middle {
-    display: contents;
-  }
-
-  .panes > .filters {
-    order: 1;
-  }
-
-  .panes > .middle > * {
-    order: 2;
-  }
-
-  .panes > .middle > .box {
-    order: 0;
-  }
-
-  .panes.showing > .filters,
-  .panes.showing > .middle > * {
-    display: none;
-  }
+.lane h2 small {
+  opacity: 0.6;
 }
 
-/* 60rem is where a third of the screen is still wider than a phone, so a pane
-   is a column somebody can read rather than a squeezed one. */
-@media (min-width: 60rem) {
-  .panes {
-    flex-direction: row;
-    align-items: stretch;
-    height: 100vh;
-  }
-
-  /* Each pane scrolls on its own: the list is long, and the Task beside it
-     should not travel with it. */
-  .pane {
-    overflow-y: auto;
-  }
-
-  .filters {
-    flex: 0 0 16rem;
-    border-right: 1px solid color-mix(in srgb, currentColor 15%, transparent);
-  }
-
-  /* The controls stack down the pane instead of wrapping across it, and each
-     takes the width it has rather than the 8rem it claims in a row. */
-  .filters .narrow {
-    flex-direction: column;
-    border-bottom: 0;
-  }
-
-  .filters .control {
-    flex: 0 0 auto;
-  }
-
-  .middle {
-    flex: 1 1 0;
-  }
-
-  .opened {
-    flex: 0 0 26rem;
-    border-left: 1px solid color-mix(in srgb, currentColor 15%, transparent);
-  }
-}
-
-/* The search box is the width of what it searches, wherever it is drawn. */
-.control.search {
-  display: block;
-  width: 100%;
+/* A card's edge is its Repo's Color, so two Repos on one lane tell apart. */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  border-inline-start: 4px solid
+    color-mix(in srgb, currentColor 30%, transparent);
   box-sizing: border-box;
-  border-radius: 0;
+}
+
+.parents {
+  opacity: 0.6;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.card-title {
+  overflow-wrap: anywhere;
+}
+
+.repo {
+  font-weight: 600;
+}
+
+.blocked {
+  color: #c0392b;
 }

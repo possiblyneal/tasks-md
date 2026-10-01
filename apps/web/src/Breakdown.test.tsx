@@ -19,9 +19,17 @@ afterEach(() => {
 const TASK: Task = {
   id: 't1',
   title: 'Move house',
+  state: 'doing',
+  tags: [],
+  created: '2026-03-04',
+  attrs: [],
+  description: '',
+  line: 4,
   depth: 0,
-  createdAt: '2026-03-04T09:00:00Z',
-  marks: [],
+  parent: '',
+  parents: [],
+  leaf: true,
+  blocked: false,
 }
 
 test('every attribute a proposal would write is drawn beside its tick', async () => {

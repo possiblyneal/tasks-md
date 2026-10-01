@@ -16,15 +16,14 @@ StartLimitBurst=5
 Type=simple
 # Two paths, both placed by hand: the binary scripts/package builds and the
 # static files apps/web builds. There is no third thing to install, because the
-# store is SQLite embedded in the binary.
+# store is the tasks.md in each Repo.
 ExecStart=%h/.local/bin/tasks api -addr :8080 -web %h/.local/share/tasks/web
 Restart=on-failure
 RestartSec=5
 
-# No TASKS_DB and no TASKS_ACTOR, deliberately. Unset, the binary resolves
-# ~/.config/tasks/tasks.db and the login name -- exactly what a verb run at the
-# terminal resolves. Naming either here would give the service a store or an
-# Actor of its own, and the Lease is only a Lease while both open the same file.
+# No environment of its own, deliberately: the service reads the roots from
+# ~/.config/tasks/config, exactly what a verb run at the terminal reads, so the
+# browser and the terminal see the same Repos.
 
 # No authentication, per ADR 0003: the listener is for the LAN, and the network
 # is the boundary. `:8080` is a wildcard bind, so the host's own interfaces are

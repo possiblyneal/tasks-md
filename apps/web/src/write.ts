@@ -1,10 +1,10 @@
-// The wire shapes the write routes take and the two Broker calls, and the
-// calls that reach them. They mirror `apps/tasks/src/api/tasks.go`,
-// `apps/tasks/src/api/series.go`, `apps/tasks/src/api/collections.go` and
-// `apps/tasks/src/api/broker.go`, which are the side that decides them.
+// The wire shapes the write and Broker routes took, and the calls that reach
+// them. No route answers any of them now: writes onto tasks.md land in #121
+// and #122, and the Broker's routes come back with #123, which mounts `Box`
+// and `Breakdown` again. They are kept so that work starts from them.
 
 import { send, sentence } from './api'
-import { type Narrowing, queryString, type Task } from './state'
+import { type Narrowing, queryString } from './state'
 
 /**
  * A Task's attributes and its memberships as they are sent, and the same shape
@@ -129,20 +129,6 @@ export async function addTask(body: TaskBody): Promise<string> {
   return written.id
 }
 
-/**
- * Changes a Task's attributes and its memberships together, as one write, and
- * attaches any pointers after it.
- */
-export async function editTask(id: string, body: TaskBody): Promise<void> {
-  const [change, pointers] = unattached(body)
-  await send<{ id: string }>(
-    'PATCH',
-    `/api/tasks/${encodeURIComponent(id)}`,
-    change,
-  )
-  await attachAll(id, pointers)
-}
-
 /** Writes one Task under another, which is the same write with a parent. */
 export async function addSubtask(
   parent: string,
@@ -156,61 +142,6 @@ export async function addSubtask(
   )
   await attachAll(written.id, pointers)
   return written.id
-}
-
-/**
- * The four, and the client's one copy of which four there are. No route
- * answers the question, so this is the list every screen that draws them reads
- * rather than each keeping its own. A fifth added to `write.Lifecycle` is a
- * button missing here until it is added, never a sentence drawn wrongly: one
- * this sends that the API does not serve comes back refused in its own words.
- */
-export const VERBS = ['complete', 'decline', 'reopen', 'delete']
-
-/** The rest of a Task's life, by the verb in the path. */
-export async function lifecycle(id: string, verb: string): Promise<void> {
-  await send<{ id: string }>(
-    'POST',
-    `/api/tasks/${encodeURIComponent(id)}/${verb}`,
-    {},
-  )
-}
-
-/**
- * A Task read back as the body that edits it. What the sheet shows is text, so
- * a deadline goes back the way it came -- RFC 3339, which `write.Deadline`
- * reads -- rather than being reformatted into something this side decided on.
- *
- * The memberships are what the Task carries now, which is what makes unticking
- * one mean something: see `memberships` below.
- */
-export function draftOf(task: Task): TaskBody {
-  return {
-    title: task.title,
-    description: task.description,
-    why: task.why,
-    color: task.color,
-    deadline: task.deadline,
-    estimate: estimate(task.estimateSeconds),
-    priority: task.priority,
-    impact: task.impact,
-    fields: task.fields,
-    intoLists: task.lists ?? [],
-    addTags: task.tags ?? [],
-  }
-}
-
-/**
- * A duration the API can read back, and the shortest of them: the wire carries
- * seconds because JavaScript has no duration, and `90m` is what somebody typed
- * in the first place. It is what the detail screen draws too, so an estimate
- * reads the same on the screen that shows it and in the field that edits it.
- */
-export function estimate(seconds?: number): string | undefined {
-  if (!seconds) return undefined
-  if (seconds % 3600 === 0) return `${seconds / 3600}h`
-  if (seconds % 60 === 0) return `${seconds / 60}m`
-  return `${seconds}s`
 }
 
 /**
@@ -232,58 +163,6 @@ export function memberships(before: TaskBody, after: TaskBody): TaskBody {
     addTags: missing(on(after, 'addTags'), on(before, 'addTags')),
     dropTags: missing(on(before, 'addTags'), on(after, 'addTags')),
   }
-}
-
-/**
- * The rule a Task repeats on, set or replaced. A Series is one value edited as
- * one thing, which is why this sends the whole rule rather than part of one.
- * A rule the parser cannot read comes back refused in the parser's own words,
- * with what was typed still in the field.
- */
-export async function repeat(id: string, rule: string): Promise<void> {
-  await send<{ id: string }>(
-    'PUT',
-    `/api/tasks/${encodeURIComponent(id)}/series`,
-    { rule },
-  )
-}
-
-/**
- * The Task stops repeating. It erases nothing despite the method: the Series
- * and every mark on its dates stay in the record.
- */
-export async function unrepeat(id: string): Promise<void> {
-  await send<{ id: string }>(
-    'DELETE',
-    `/api/tasks/${encodeURIComponent(id)}/series`,
-    {},
-  )
-}
-
-/**
- * The three, and the client's copy of which three there are, for the same
- * reason `VERBS` is one: no route answers the question. A fourth added to
- * `write.Mark` is a button missing here until it is added, never a sentence
- * drawn wrongly.
- */
-export const MARKS = ['tick', 'skip', 'detach']
-
-/**
- * One date ticked, skipped or lifted out, and the id that names what happened:
- * detaching answers the Task the date became, and the other two answer the
- * Task the mark was against.
- */
-export async function mark(
-  id: string,
-  which: string,
-  on: string,
-): Promise<string> {
-  const written = await send<{ id: string }>(
-    'POST',
-    `/api/tasks/${encodeURIComponent(id)}/series/${which}`,
-    { on },
-  )
-  return written.id
 }
 
 /** One question the Broker asked and the answer it was given back. */
@@ -322,29 +201,6 @@ export function breakdown(task: string, answers: QA[]): Promise<Step> {
 }
 
 /**
- * One date lifted out as the Task it was corrected into, which is the fourth
- * thing done to a date and one write rather than a detach and then an edit of
- * what it became. It answers the Task the date became.
- *
- * `POST .../series/edit` is its own route rather than a fourth `MARKS` name,
- * because it carries a whole Task where the three carry only the date.
- */
-export async function detachEdited(
-  id: string,
-  on: string,
-  body: TaskBody,
-): Promise<string> {
-  const [lift, pointers] = unattached(body)
-  const written = await send<{ id: string }>(
-    'POST',
-    `/api/tasks/${encodeURIComponent(id)}/series/edit`,
-    { ...lift, on },
-  )
-  await attachAll(written.id, pointers)
-  return written.id
-}
-
-/**
  * A List or a Tag as `api.collectionBody` takes one. Both attributes follow the
  * same rule every attribute of a Task follows: absent leaves it alone, which is
  * what makes a rename and a recolor one body rather than two writes.
@@ -371,32 +227,6 @@ export async function addCollection(
   return written.id
 }
 
-/** Renames a List or Tag, recolors it, or does both as the one write it is. */
-export async function describeCollection(
-  kind: Kind,
-  id: string,
-  body: CollectionBody,
-): Promise<void> {
-  await send<{ id: string }>(
-    'PATCH',
-    `/api/${kind}/${encodeURIComponent(id)}`,
-    body,
-  )
-}
-
-/**
- * Deletes a List or Tag. Every Task that carried it goes on existing and loses
- * the membership, which is the store's transaction and not something this
- * screen arranges afterwards.
- */
-export async function dropCollection(kind: Kind, id: string): Promise<void> {
-  await send<{ id: string }>(
-    'DELETE',
-    `/api/${kind}/${encodeURIComponent(id)}`,
-    undefined,
-  )
-}
-
 /**
  * Points a Task at something outside the tracker: a web address, or a path as
  * the machine running `tasks api` would read it. Nothing is uploaded and nothing
@@ -406,21 +236,6 @@ export async function dropCollection(kind: Kind, id: string): Promise<void> {
 export async function attach(id: string, target: string): Promise<void> {
   await send<{ id: string }>(
     'POST',
-    `/api/tasks/${encodeURIComponent(id)}/attachments`,
-    { target },
-  )
-}
-
-/**
- * Takes a pointer off a Task. What it pointed at is not the tracker's to touch,
- * so nothing else happens.
- *
- * The target is in the body rather than the path because it carries its own
- * slashes, which is the same reason the route takes it there.
- */
-export async function detach(id: string, target: string): Promise<void> {
-  await send<{ id: string }>(
-    'DELETE',
     `/api/tasks/${encodeURIComponent(id)}/attachments`,
     { target },
   )

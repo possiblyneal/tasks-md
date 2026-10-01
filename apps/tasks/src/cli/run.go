@@ -3,13 +3,9 @@ package cli
 import (
 	"fmt"
 	"io"
-	"os"
-	"os/user"
-	"path/filepath"
 	"strings"
 
 	"github.com/possiblyneal/tasks-md/apps/tasks/src/api"
-	"github.com/possiblyneal/tasks-md/apps/tasks/src/store"
 )
 
 // Run is the whole program behind main, taking its streams as arguments so the
@@ -28,47 +24,19 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 }
 
-// verbs is every verb there is, in the order usage names them. Which verb makes
-// which call is written here once, the way `write.Lifecycle` holds the four
-// lifecycle verbs, so the sentence a bare `tasks` prints and the dispatch below
-// cannot name different sets and let the binary lie about what it accepts.
+// verbs is every verb there is, in the order usage names them, so the sentence
+// a bare `tasks` prints and the dispatch below cannot name different sets.
 var verbs = []struct {
 	verb string
-	run  func(s *store.Store, args []string, stdout, stderr io.Writer) int
+	run  func(args []string, stdout, stderr io.Writer) int
 }{
-	{"add", addTask},
-	{"capture", captureTask},
-	{"list", listTasks},
-	{"edit", func(s *store.Store, args []string, _, stderr io.Writer) int {
-		return editTask(s, args, stderr)
-	}},
-	{"lists", func(s *store.Store, args []string, stdout, stderr io.Writer) int {
-		return collections(s, "lists", args, stdout, stderr)
-	}},
-	{"tags", func(s *store.Store, args []string, stdout, stderr io.Writer) int {
-		return collections(s, "tags", args, stdout, stderr)
-	}},
-	{"attach", attachTask},
-	{"repeat", repeatTask},
-	{"complete", lifecycleVerb("complete")},
-	{"decline", lifecycleVerb("decline")},
-	{"reopen", lifecycleVerb("reopen")},
-	{"delete", lifecycleVerb("delete")},
+	{"list", list},
+	{"repos", listRepos},
+	{"lint", lint},
 }
 
-// lifecycleVerb is one of the four, which take one id and no flags and differ
-// only in the name they pass on. `write.Lifecycle` is what knows the four; this
-// is only how the CLI reaches one of them.
-func lifecycleVerb(verb string) func(*store.Store, []string, io.Writer, io.Writer) int {
-	return func(s *store.Store, args []string, _, stderr io.Writer) int {
-		return lifecycle(s, verb, args, stderr)
-	}
-}
-
-// usage is bare `tasks`: what the binary does and how to reach it. Opening the
-// TUI was what this used to do; the person's surface is the browser client now,
-// which `tasks api` serves, so there is nothing left for a bare invocation to
-// open. It is an error rather than a help screen because nothing was asked for.
+// usage is bare `tasks`: what the binary does and how to reach it. It is an
+// error rather than a help screen because nothing was asked for.
 func usage(stderr io.Writer) int {
 	named := make([]string, len(verbs))
 	for i, one := range verbs {
@@ -84,100 +52,36 @@ Verbs: %s. Each takes -h for its own flags.
 	return 2
 }
 
-// runAPI is `tasks api`: the same store over HTTP, for the browser client. It
-// opens the store the other modes open, in this one process, and serves the
-// compiled client's files beside the JSON when it is given a directory of
-// them, so there is no second process and no CORS.
+// runAPI is `tasks api`: the same reads over HTTP, for the browser client. It
+// serves the compiled client's files beside the JSON when it is given a
+// directory of them, so there is no second process and no CORS.
 //
-// There is no authentication, deliberately: the listener is for the LAN. That
-// is the posture `tasks serve` had minus the public key it wanted, and ADR
-// 0003's first re-check trigger is what covers changing it.
+// There is no authentication, deliberately: the listener is for the LAN, and
+// ADR 0003's first re-check trigger is what covers changing that.
 func runAPI(args []string, stderr io.Writer) int {
 	fs := flags("api", stderr)
-	// Every write through the listener is attributed to whoever started it,
-	// because there is no authentication and so nobody to name per request.
-	// It is the same Actor the verbs resolve, so a person at the terminal and
-	// the same person in the browser are one Actor in the Change History.
-	o := api.Options{Actor: actor()}
+	var o api.Options
 	fs.StringVar(&o.Addr, "addr", ":8080", "address to listen on")
 	fs.StringVar(&o.Web, "web", "", "directory of compiled client files to serve beside the json")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-
-	s, err := open()
-	if err != nil {
-		fmt.Fprintf(stderr, "tasks api: %v\n", err)
-		return 1
-	}
-	defer func() { _ = s.Close() }()
-
-	if err := api.ListenAndServe(s, o, stderr); err != nil {
+	if err := api.ListenAndServe(o, stderr); err != nil {
 		fmt.Fprintf(stderr, "tasks api: %v\n", err)
 		return 1
 	}
 	return 0
 }
 
-// runVerb is the acts-and-exits mode. It is the identical in-process call the
-// API makes, not a second implementation of the rules: both reach the store
-// through the same package, so an Agent and a person get the same contract.
-//
-// Every verb that writes takes the Lease covering its target's tree, writes,
-// and gives it back. An Agent is invoked and exits, so it should not leave a
-// Lease standing behind it.
+// runVerb is the acts-and-exits mode. Each verb reads through the same board
+// package the API reads through, so an Agent and a person get the same answer.
 func runVerb(args []string, stdout, stderr io.Writer) int {
 	verb, rest := args[0], args[1:]
-
-	s, err := open()
-	if err != nil {
-		fmt.Fprintf(stderr, "tasks: %v\n", err)
-		return 1
-	}
-	defer func() { _ = s.Close() }()
-
 	for _, one := range verbs {
 		if one.verb == verb {
-			return one.run(s, rest, stdout, stderr)
+			return one.run(rest, stdout, stderr)
 		}
 	}
 	fmt.Fprintf(stderr, "tasks: unknown verb %q\n", verb)
 	return 2
-}
-
-func open() (*store.Store, error) {
-	path, err := storePath()
-	if err != nil {
-		return nil, err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return nil, fmt.Errorf("make the store directory: %w", err)
-	}
-	return store.Open(path)
-}
-
-// storePath is where the SQLite file lives. TASKS_DB overrides it, which is how
-// a test and an Agent run against a store of their own.
-func storePath() (string, error) {
-	if path := os.Getenv("TASKS_DB"); path != "" {
-		return path, nil
-	}
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("find the store: %w", err)
-	}
-	return filepath.Join(dir, "tasks", "tasks.db"), nil
-}
-
-// actor names who is writing. Writes are attributed and reads are not, and an
-// Agent says who it is through TASKS_ACTOR; a person at a keyboard is their
-// login.
-func actor() string {
-	if a := strings.TrimSpace(os.Getenv("TASKS_ACTOR")); a != "" {
-		return a
-	}
-	if u, err := user.Current(); err == nil && u.Username != "" {
-		return u.Username
-	}
-	return "unknown"
 }

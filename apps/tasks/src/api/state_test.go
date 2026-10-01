@@ -6,296 +6,209 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/possiblyneal/tasks-md/apps/tasks/src/store"
+	"github.com/possiblyneal/tasks-md/apps/tasks/src/board"
 )
 
-func openTemp(t *testing.T) *store.Store {
+const houseMove = `# Tasks
+color: green
+
+- [ ] Pack the kitchen | doing #kitchen
+  - id: m3qa
+  - created: 2026-09-20
+  - [ ] Wrap glassware | doing
+    - id: m3qc
+    - created: 2026-09-20
+- [ ] Book the van | backlog
+  - id: v9t1
+  - created: 2026-09-21
+  - blocked by: m3qa
+`
+
+const work = `# Tasks
+
+- [ ] Write the report | inbox
+  - created: 2026-09-22
+`
+
+// homeWith gives the test a home of its own whose one root, ~/code, holds a
+// folder per entry with that tasks.md. It returns ~/code.
+func homeWith(t *testing.T, files map[string]string) string {
 	t.Helper()
-	s, err := store.Open(filepath.Join(t.TempDir(), "tasks.db"))
+	dir, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
-		t.Fatalf("Open: %v", err)
+		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = s.Close() })
-	return s
+	t.Setenv("HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, ".config"))
+	code := filepath.Join(dir, "code")
+	for name, text := range files {
+		place(t, filepath.Join(code, name), text)
+	}
+	return code
 }
 
-func add(t *testing.T, s *store.Store, title string) string {
+func place(t *testing.T, dir, text string) {
 	t.Helper()
-	id, err := s.AddTask("tester", store.Attributes{Title: &title})
-	if err != nil {
-		t.Fatalf("AddTask: %v", err)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
 	}
-	return id
+	if err := os.WriteFile(filepath.Join(dir, "tasks.md"), []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
-// get runs one request against the whole handler, which is what a client
-// reaches: routing included, so a route that moved is a failing test.
-func get(t *testing.T, s *store.Store, target string, header http.Header) *httptest.ResponseRecorder {
+func get(t *testing.T, h http.Handler, target string, header http.Header) *httptest.ResponseRecorder {
 	t.Helper()
 	r := httptest.NewRequest(http.MethodGet, target, nil)
-	for k, values := range header {
-		for _, v := range values {
-			r.Header.Add(k, v)
-		}
+	for k, v := range header {
+		r.Header[k] = v
 	}
 	w := httptest.NewRecorder()
-	Handler(s, Options{}).ServeHTTP(w, r)
+	h.ServeHTTP(w, r)
 	return w
 }
 
-func decodeState(t *testing.T, w *httptest.ResponseRecorder) stateBody {
+func decodeState(t *testing.T, w *httptest.ResponseRecorder) board.Board {
 	t.Helper()
-	var body stateBody
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (%s)", w.Code, w.Body.String())
+	}
+	var body board.Board
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v (%s)", err, w.Body.String())
 	}
 	return body
 }
 
-func TestStateReturnsTheTreeAndItsCollections(t *testing.T) {
-	s := openTemp(t)
-	parent := add(t, s, "Paint the fence")
-	if err := s.WithLease("tester", parent, store.WriteTTL, func() error {
-		_, err := s.AddSubtask("tester", parent, store.Attributes{Title: ptr("Buy paint")})
-		return err
-	}); err != nil {
-		t.Fatalf("AddSubtask: %v", err)
+func TestStateAnswersEveryRepoWithItsFlags(t *testing.T) {
+	code := homeWith(t, map[string]string{"house-move": houseMove, "work": work})
+	h := Handler(Options{})
+
+	body := decodeState(t, get(t, h, "/api/state", nil))
+	if len(body.Repos) != 2 {
+		t.Fatalf("repos = %+v, want two", body.Repos)
 	}
-	if _, err := s.AddList("tester", "Home", "blue"); err != nil {
-		t.Fatalf("AddList: %v", err)
+	house, report := body.Repos[0], body.Repos[1]
+	if house.Name != "house-move" || house.Path != filepath.Join(code, "house-move") || house.Color != "green" {
+		t.Errorf("house-move = %+v", house)
 	}
-	if _, err := s.AddTag("tester", "errand", "green"); err != nil {
-		t.Fatalf("AddTag: %v", err)
+	if len(house.Tasks) != 3 || !house.Tasks[2].Blocked || house.Tasks[1].Parents[0] != "Pack the kitchen" {
+		t.Errorf("house-move's tasks = %+v", house.Tasks)
+	}
+	// A clean Repo says so with an empty list; one with a problem is flagged
+	// by it, line and all.
+	if house.Problems == nil || len(house.Problems) != 0 {
+		t.Errorf("house-move problems = %#v, want []", house.Problems)
+	}
+	if len(report.Problems) != 1 || report.Problems[0].Line != 3 || !strings.Contains(report.Problems[0].Message, "no id") {
+		t.Errorf("work problems = %+v, want the missing id on line 3", report.Problems)
+	}
+	if body.Errors == nil {
+		t.Error("errors = null, want []")
 	}
 
-	w := get(t, s, "/api/state", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", w.Code)
-	}
-	body := decodeState(t, w)
-
-	if len(body.Tasks) != 2 {
-		t.Fatalf("tasks = %d, want 2", len(body.Tasks))
-	}
-	// Tasks comes back depth first, so the Subtask follows its parent and
-	// carries the depth the client indents by.
-	if body.Tasks[0].Depth != 1 || body.Tasks[1].Depth != 2 {
-		t.Errorf("depths = %d, %d, want 1, 2", body.Tasks[0].Depth, body.Tasks[1].Depth)
-	}
-	if body.Tasks[1].Parent != parent {
-		t.Errorf("parent = %q, want %q", body.Tasks[1].Parent, parent)
-	}
-	if len(body.Lists) != 1 || len(body.Tags) != 1 {
-		t.Errorf("lists = %d, tags = %d, want 1 and 1", len(body.Lists), len(body.Tags))
+	// Rescanned per request: a Repo made after the handler was built is read.
+	place(t, filepath.Join(code, "garden"), "# Tasks\n")
+	if again := decodeState(t, get(t, h, "/api/state", nil)); len(again.Repos) != 3 {
+		t.Errorf("repos after adding one = %d, want 3", len(again.Repos))
 	}
 }
 
-func TestStateSaysWhatAReadWorkedOut(t *testing.T) {
-	s := openTemp(t)
-	id := add(t, s, "Ship it")
-	if err := s.WithLease("tester", id, store.WriteTTL, func() error {
-		return s.CompleteTask("tester", id)
-	}); err != nil {
-		t.Fatalf("CompleteTask: %v", err)
+func TestStateNarrowsTheWayTasksListDoes(t *testing.T) {
+	homeWith(t, map[string]string{"house-move": houseMove, "work": work})
+	h := Handler(Options{})
+	cases := map[string]int{
+		"?repo=work":                   1,
+		"?state=doing":                 2,
+		"?state=backlog&state=inbox":   2,
+		"?tag=kitchen":                 1,
+		"?search=VAN":                  1,
+		"?unblocked=true":              3,
+		"?repo=house-move&state=inbox": 0,
+		"?repo=&tag=&search=&state=":   -1, // an empty parameter narrows nothing
+		"?repo=house-move&unblocked=1": 2,
 	}
-
-	// A completed Task is out of the everyday view, so it takes all=true to
-	// see it at all, and it arrives carrying the mark rather than a field the
-	// client would have to work the mark out from.
-	body := decodeState(t, get(t, s, "/api/state?all=true", nil))
-	if len(body.Tasks) != 1 {
-		t.Fatalf("tasks = %d, want 1", len(body.Tasks))
-	}
-	if got := body.Tasks[0].Marks; len(got) != 1 || got[0] != "done" {
-		t.Errorf("marks = %v, want [done]", got)
-	}
-	if body.Tasks[0].CompletedAt == "" {
-		t.Error("completedAt is empty on a completed Task")
-	}
-	// A Task with no deadline has no deadline, rather than one in year one.
-	if body.Tasks[0].Deadline != "" {
-		t.Errorf("deadline = %q, want empty", body.Tasks[0].Deadline)
+	for query, want := range cases {
+		body := decodeState(t, get(t, h, "/api/state"+query, nil))
+		n := 0
+		for _, r := range body.Repos {
+			n += len(r.Tasks)
+		}
+		if want == -1 {
+			want = 4
+		}
+		if n != want {
+			t.Errorf("%s: %d Tasks, want %d", query, n, want)
+		}
 	}
 }
 
-func TestStateAnswers304OnlyForTheSameRepresentation(t *testing.T) {
-	s := openTemp(t)
-	add(t, s, "Water the plants")
+func TestStateRefusesWhatItCannotAnswer(t *testing.T) {
+	homeWith(t, map[string]string{"work": work})
+	h := Handler(Options{})
+	for query, status := range map[string]int{
+		"?repo=nowhere":    http.StatusNotFound,
+		"?state=someday":   http.StatusBadRequest,
+		"?unblocked=maybe": http.StatusBadRequest,
+	} {
+		w := get(t, h, "/api/state"+query, http.Header{"If-None-Match": {"*"}})
+		if w.Code != status || !strings.Contains(w.Body.String(), `"error"`) {
+			t.Errorf("%s = %d %s, want %d with an error sentence", query, w.Code, w.Body.String(), status)
+		}
+	}
+}
 
-	first := get(t, s, "/api/state", nil)
+func TestStateETagFollowsTheFilesAndTheQuery(t *testing.T) {
+	code := homeWith(t, map[string]string{"work": work})
+	h := Handler(Options{})
+
+	first := get(t, h, "/api/state", nil)
 	tag := first.Header().Get("ETag")
 	if tag == "" {
-		t.Fatal("no ETag on a store that has been written to")
+		t.Fatal("no ETag")
 	}
-
-	again := get(t, s, "/api/state", http.Header{"If-None-Match": {tag}})
-	if again.Code != http.StatusNotModified {
-		t.Errorf("unchanged store = %d, want 304", again.Code)
-	}
-
-	// The token is store-global and the response is not: a different query is
-	// a different representation, whether or not anything has been written.
-	other := get(t, s, "/api/state?all=true", http.Header{"If-None-Match": {tag}})
-	if other.Code != http.StatusOK {
-		t.Errorf("different query = %d, want 200", other.Code)
-	}
-	if other.Header().Get("ETag") == tag {
-		t.Error("a different query carries the same ETag")
-	}
-
-	add(t, s, "Feed the cat")
-	written := get(t, s, "/api/state", http.Header{"If-None-Match": {tag}})
-	if written.Code != http.StatusOK {
-		t.Errorf("after a write = %d, want 200", written.Code)
-	}
-}
-
-func TestStateRefusesASortTheStoreDoesNotHave(t *testing.T) {
-	s := openTemp(t)
-	w := get(t, s, "/api/state?sort=whenever", nil)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400", w.Code)
-	}
-	var body map[string]string
-	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if body["error"] == "" {
-		t.Errorf("body = %v, want an error sentence", body)
-	}
-}
-
-func TestStateTakesEverySortTheStoreHas(t *testing.T) {
-	s := openTemp(t)
-	add(t, s, "Sortable")
-	for _, sort := range store.Sorts {
-		w := get(t, s, "/api/state?sort="+string(sort), nil)
-		if w.Code != http.StatusOK {
-			t.Errorf("sort=%s = %d, want 200", sort, w.Code)
+	for _, header := range []string{tag, "W/" + tag, `"other", ` + tag, "*"} {
+		if w := get(t, h, "/api/state", http.Header{"If-None-Match": {header}}); w.Code != http.StatusNotModified {
+			t.Errorf("If-None-Match %s = %d, want 304", header, w.Code)
 		}
 	}
-}
-
-// The sorts the response offers are the sorts it accepts. A surface drawing a
-// picker from this must not be able to offer one the store would refuse, which
-// is the whole reason the list is on the wire rather than copied client-side.
-func TestStateOffersExactlyTheSortsItAccepts(t *testing.T) {
-	s := openTemp(t)
-	state := decodeState(t, get(t, s, "/api/state", nil))
-
-	if len(state.Sorts) != len(store.Sorts) {
-		t.Fatalf("sorts = %v, want %v", state.Sorts, store.SortNames())
-	}
-	for i, sort := range store.Sorts {
-		if state.Sorts[i] != string(sort) {
-			t.Errorf("sorts[%d] = %q, want %q", i, state.Sorts[i], sort)
-		}
-		if w := get(t, s, "/api/state?sort="+state.Sorts[i], nil); w.Code != http.StatusOK {
-			t.Errorf("sort=%s = %d, want 200", state.Sorts[i], w.Code)
-		}
-	}
-}
-
-func ptr[T any](v T) *T { return &v }
-
-// An empty list on the wire is `[]` and never `null`, in every place one can
-// appear. The client counts these without checking them first, which a `null`
-// would make a crash rather than a zero.
-func TestStateWritesAnEmptyListAsAList(t *testing.T) {
-	s := openTemp(t)
-	add(t, s, "Nothing hangs off this one")
-
-	w := get(t, s, "/api/state", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", w.Code)
-	}
-	if body := w.Body.String(); strings.Contains(body, "null") {
-		t.Errorf("the response carries a null: %s", body)
+	if w := get(t, h, "/api/state?state=inbox", http.Header{"If-None-Match": {tag}}); w.Code != http.StatusOK {
+		t.Errorf("another query under the same tag = %d, want 200", w.Code)
 	}
 
-	state := decodeState(t, w)
-	if state.Lists == nil || state.Tags == nil {
-		t.Errorf("Lists = %v, Tags = %v, want both empty rather than nil", state.Lists, state.Tags)
+	later := time.Now().Add(time.Hour)
+	if err := os.Chtimes(filepath.Join(code, "work", "tasks.md"), later, later); err != nil {
+		t.Fatal(err)
 	}
-	if len(state.Tasks) != 1 || state.Tasks[0].Marks == nil {
-		t.Errorf("Marks = %v, want empty rather than nil", state.Tasks[0].Marks)
-	}
-}
-
-// The store keeps the only list of sorts there is, so the sentence a bad one
-// gets is the store's own, word for word, rather than a second phrasing this
-// package keeps beside it.
-func TestStateRefusesASortInTheStoresOwnWords(t *testing.T) {
-	s := openTemp(t)
-	w := get(t, s, "/api/state?sort=nope", nil)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400", w.Code)
-	}
-
-	_, err := s.Tasks(store.Query{Sort: "nope"})
-	if err == nil {
-		t.Fatal("the store took a sort it does not have")
-	}
-	var body map[string]string
-	if decodeErr := json.Unmarshal(w.Body.Bytes(), &body); decodeErr != nil {
-		t.Fatalf("decode: %v", decodeErr)
-	}
-	if body["error"] != err.Error() {
-		t.Errorf("body = %q, want the store's own %q", body["error"], err.Error())
-	}
-}
-
-// An If-None-Match is read the way RFC 9110 writes one: several tags to a
-// line, and a weak one still matching. A client whose tags arrive joined by a
-// proxy would otherwise re-read the whole list on every poll.
-func TestStateReads304FromEveryShapeOfIfNoneMatch(t *testing.T) {
-	s := openTemp(t)
-	add(t, s, "Water the plants")
-	tag := get(t, s, "/api/state", nil).Header().Get("ETag")
-	if tag == "" {
-		t.Fatal("no ETag on a store that has been written to")
-	}
-
-	for _, sent := range []string{tag, `"other", ` + tag, "W/" + tag, "*"} {
-		w := get(t, s, "/api/state", http.Header{"If-None-Match": {sent}})
-		if w.Code != http.StatusNotModified {
-			t.Errorf("If-None-Match: %s = %d, want 304", sent, w.Code)
-		}
-	}
-
-	w := get(t, s, "/api/state", http.Header{"If-None-Match": {`"nothing like it"`}})
-	if w.Code != http.StatusOK {
-		t.Errorf("a tag naming another representation = %d, want 200", w.Code)
+	if w := get(t, h, "/api/state", http.Header{"If-None-Match": {tag}}); w.Code != http.StatusOK {
+		t.Errorf("after the file changed = %d, want 200", w.Code)
 	}
 }
 
 // A route this package does not serve is a usage error with a sentence in it,
-// even with the client's files being served underneath. The fallback answers any
-// path it is given, so an /api/ typo would otherwise be index.html at 200 and
-// the client would fail parsing HTML as JSON instead of saying what happened.
+// even with the client's files being served underneath. The fallback answers
+// any path it is given, so an /api/ typo would otherwise be index.html at 200
+// and the client would fail parsing HTML as JSON instead of saying what
+// happened.
 func TestAnAPIRouteThatIsNotOneIsNotTheClient(t *testing.T) {
-	s := openTemp(t)
+	homeWith(t, nil)
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("<title>tasks</title>"), 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-
-	serve := func(method, target string) *httptest.ResponseRecorder {
-		w := httptest.NewRecorder()
-		Handler(s, Options{Web: dir}).ServeHTTP(w, httptest.NewRequest(method, target, nil))
-		return w
-	}
+	served := Handler(Options{Web: dir})
 
 	for _, r := range []struct{ method, target string }{
 		{http.MethodGet, "/api/stat"},
 		{http.MethodPost, "/api/state"},
 		{http.MethodGet, "/api/tasks/nope"},
 	} {
-		w := serve(r.method, r.target)
+		w := httptest.NewRecorder()
+		served.ServeHTTP(w, httptest.NewRequest(r.method, r.target, nil))
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("%s %s = %d, want 400 rather than the client", r.method, r.target, w.Code)
 		}
@@ -305,19 +218,14 @@ func TestAnAPIRouteThatIsNotOneIsNotTheClient(t *testing.T) {
 	}
 
 	// A path the client routes in the browser still reaches the client.
-	if w := serve(http.MethodGet, "/activity"); w.Code != http.StatusOK {
-		t.Errorf("/activity = %d, want the client at 200", w.Code)
+	if w := get(t, served, "/board", nil); w.Code != http.StatusOK {
+		t.Errorf("/board = %d, want the client at 200", w.Code)
 	}
 
-	// Serving the JSON alone says the same thing about the same bad route, so
-	// a client on its own dev server is not told something different from one
-	// reading the files this process serves.
-	alone := get(t, s, "/api/typo", nil)
-	if alone.Code != http.StatusBadRequest {
-		t.Errorf("/api/typo with no client served = %d, want 400", alone.Code)
-	}
-	if !strings.Contains(alone.Body.String(), "is not a route") {
-		t.Errorf("body = %s, want a sentence saying so", alone.Body.String())
+	// Serving the JSON alone says the same thing about the same bad route.
+	alone := get(t, Handler(Options{}), "/api/typo", nil)
+	if alone.Code != http.StatusBadRequest || !strings.Contains(alone.Body.String(), "is not a route") {
+		t.Errorf("/api/typo with no client served = %d %s, want 400 saying so", alone.Code, alone.Body.String())
 	}
 }
 
@@ -346,174 +254,5 @@ func TestAPathThatClimbsOutOfTheServedDirectoryDoesNot(t *testing.T) {
 		if strings.Contains(w.Body.String(), "not for the browser") {
 			t.Errorf("%s was served the file above the directory", target)
 		}
-	}
-}
-
-// The Tag and the search reach the read the same way the List does, under the
-// names `tasks list` takes them under. An Agent narrows by query string and a
-// person's client narrows by query string, so what a client can ask for is what
-// this route accepts and no less.
-func TestStateNarrowsByTagAndBySearch(t *testing.T) {
-	s := openTemp(t)
-	fence := add(t, s, "Paint the fence")
-	shop := add(t, s, "Buy paint")
-	tag, err := s.AddTag("tester", "errand", "green")
-	if err != nil {
-		t.Fatalf("AddTag: %v", err)
-	}
-	if err := s.WithLease("tester", shop, store.WriteTTL, func() error {
-		return s.AttachTag("tester", shop, tag)
-	}); err != nil {
-		t.Fatalf("AttachTag: %v", err)
-	}
-
-	body := decodeState(t, get(t, s, "/api/state?tag="+tag, nil))
-	if len(body.Tasks) != 1 || body.Tasks[0].ID != shop {
-		t.Errorf("tag narrowing gave %d tasks, want only the tagged one", len(body.Tasks))
-	}
-
-	body = decodeState(t, get(t, s, "/api/state?search=fence", nil))
-	if len(body.Tasks) != 1 || body.Tasks[0].ID != fence {
-		t.Errorf("search gave %d tasks, want only the one whose words hold it", len(body.Tasks))
-	}
-}
-
-// `?tag=` repeated is how a set of them is asked for. The ETag hashes the query
-// string, so two Tags named cannot be answered 304 against one.
-func TestStateNarrowsByEveryTagNamed(t *testing.T) {
-	s := openTemp(t)
-	fence := add(t, s, "Paint the fence")
-	shop := add(t, s, "Buy paint")
-	add(t, s, "Read a book")
-
-	tagged := map[string]string{"errand": shop, "outdoors": fence}
-	var ids []string
-	for name, task := range tagged {
-		tag, err := s.AddTag("tester", name, "green")
-		if err != nil {
-			t.Fatalf("AddTag: %v", err)
-		}
-		ids = append(ids, tag)
-		if err := s.WithLease("tester", task, store.WriteTTL, func() error {
-			return s.AttachTag("tester", task, tag)
-		}); err != nil {
-			t.Fatalf("AttachTag: %v", err)
-		}
-	}
-
-	body := decodeState(t, get(t, s, "/api/state?tag="+ids[0]+"&tag="+ids[1], nil))
-	if len(body.Tasks) != 2 {
-		t.Errorf("two tags named gave %d tasks, want the one carrying each", len(body.Tasks))
-	}
-}
-
-// `?tag=` with nothing after it is no Tag named, the way `?list=` is. An Agent
-// building a query out of a variable nobody set asks for the list rather than
-// for silence, which is the contract this route owes it and owes a person.
-func TestAnEmptyNarrowingParameterNarrowsNothing(t *testing.T) {
-	s := openTemp(t)
-	add(t, s, "Paint the fence")
-	add(t, s, "Read a book")
-
-	for _, path := range []string{"/api/state", "/api/state?tag=", "/api/state?list=", "/api/state?tag=&tag="} {
-		body := decodeState(t, get(t, s, path, nil))
-		if len(body.Tasks) != 2 {
-			t.Errorf("%s gave %d tasks, want the whole list", path, len(body.Tasks))
-		}
-	}
-}
-
-// The colors and the snoozes are the store's own lists, served for the same
-// reason the sorts are: a surface offering either would otherwise keep a second
-// copy and go on offering what the store stopped taking. Each is checked
-// against the store's list rather than against nine and four written out here,
-// which would be this test keeping the copy instead.
-func TestStateOffersTheStoresColorsAndSnoozes(t *testing.T) {
-	s := openTemp(t)
-	id := add(t, s, "Paint the fence")
-	state := decodeState(t, get(t, s, "/api/state", nil))
-
-	if got, want := state.Colors, store.ColorNames(); !slices.Equal(got, want) {
-		t.Errorf("colors = %v, want %v", got, want)
-	}
-	if got, want := state.Snoozes, store.SnoozeNames(); !slices.Equal(got, want) {
-		t.Errorf("snoozes = %v, want %v", got, want)
-	}
-
-	// Every one offered is one a write takes, which is what stops the lists
-	// being a menu with entries the store turns away.
-	for _, color := range state.Colors {
-		w := do(t, s, http.MethodPatch, "/api/tasks/"+id, `{"color": "`+color+`"}`)
-		if w.Code != http.StatusOK {
-			t.Errorf("color %s = %d, want 200 (%s)", color, w.Code, w.Body.String())
-		}
-	}
-	for _, snooze := range state.Snoozes {
-		w := do(t, s, http.MethodPatch, "/api/tasks/"+id, `{"snooze": "`+snooze+`"}`)
-		if w.Code != http.StatusOK {
-			t.Errorf("snooze %s = %d, want 200 (%s)", snooze, w.Code, w.Body.String())
-		}
-	}
-}
-
-// The levels travel with their examples, and both fields carry all three: the
-// example is the only thing making the three words mean the same to a person
-// and to an Agent, so a level served without one is the copy this move was
-// made to retire.
-func TestStateOffersTheLevelsWithTheirExamples(t *testing.T) {
-	s := openTemp(t)
-	id := add(t, s, "Paint the fence")
-	state := decodeState(t, get(t, s, "/api/state", nil))
-
-	for _, both := range []struct {
-		what  string
-		got   []level
-		want  map[store.Level]string
-		patch string
-	}{
-		{"priorities", state.Priorities, store.PriorityExamples, "priority"},
-		{"impacts", state.Impacts, store.ImpactExamples, "impact"},
-	} {
-		// Fatal rather than an error carried on: the loop below indexes
-		// store.Levels by the position of what came back, so a longer answer
-		// would panic where it should have failed.
-		if len(both.got) != len(store.Levels) {
-			t.Fatalf("%s = %d, want %d", both.what, len(both.got), len(store.Levels))
-		}
-		for i, one := range both.got {
-			if want := string(store.Levels[i]); one.Name != want {
-				t.Errorf("%s[%d] = %q, want %q", both.what, i, one.Name, want)
-			}
-			if want := both.want[store.Levels[i]]; one.Example != want {
-				t.Errorf("%s[%d] example = %q, want %q", both.what, i, one.Example, want)
-			}
-			// Every one offered is one a write takes, the rule the colors and
-			// the snoozes are held to above.
-			w := do(t, s, http.MethodPatch, "/api/tasks/"+id, `{"`+both.patch+`": "`+one.Name+`"}`)
-			if w.Code != http.StatusOK {
-				t.Errorf("%s %s = %d, want 200 (%s)", both.what, one.Name, w.Code, w.Body.String())
-			}
-		}
-	}
-}
-
-// A refusal beats a cache. `If-None-Match: *` matches any representation at
-// all, and the ETag block answers without reading, so a query the store would
-// refuse has to be refused before that block runs. Otherwise a caller is told
-// nothing changed about a view it can never be shown.
-func TestABadSortIsRefusedEvenWithIfNoneMatchStar(t *testing.T) {
-	s := openTemp(t)
-	for _, path := range []string{"/api/state?sort=nope", "/api/state?sort=nope&all=true"} {
-		w := get(t, s, path, http.Header{"If-None-Match": {"*"}})
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("%s with If-None-Match: * = %d, want 400", path, w.Code)
-		}
-	}
-
-	// A sort the store does have is still answered 304, so the refusal above
-	// is the bad sort and not the header having stopped working.
-	w := get(t, s, "/api/state?sort=title", http.Header{"If-None-Match": {"*"}})
-	if w.Code != http.StatusNotModified {
-		t.Errorf("a good sort with If-None-Match: * = %d, want 304", w.Code)
 	}
 }
