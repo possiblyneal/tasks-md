@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -125,7 +126,8 @@ func orDash(id string) string {
 }
 
 // listRepos is `tasks repos`: every Repo the tracker sees, where it lives, and
-// how many of its Tasks are in each State. It is read-only: a Repo is made,
+// how many of its Tasks are in each State, and what its tasks history is
+// flagged with, - for nothing. It is read-only: a Repo is made,
 // renamed or removed as a folder.
 func listRepos(args []string, stdout, stderr io.Writer) int {
 	fs := flags("repos", stderr)
@@ -134,17 +136,18 @@ func listRepos(args []string, stdout, stderr io.Writer) int {
 	}
 	found, errs := board.Discover()
 	w := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintf(w, "NAME\tPATH\t%s\n", strings.ToUpper(strings.Join(stateWords(), "\t")))
+	fmt.Fprintf(w, "NAME\tPATH\t%s\tFLAGS\n", strings.ToUpper(strings.Join(stateWords(), "\t")))
 	for _, r := range found {
+		read := board.ReadRepo(r)
 		counts := map[taskfile.State]int{}
-		for _, t := range board.ReadRepo(r).Tasks {
+		for _, t := range read.Tasks {
 			counts[t.State]++
 		}
 		fmt.Fprintf(w, "%s\t%s", r.Name, r.Path)
 		for _, s := range taskfile.States {
 			fmt.Fprintf(w, "\t%d", counts[s])
 		}
-		fmt.Fprintln(w)
+		fmt.Fprintf(w, "\t%s\n", cmp.Or(strings.Join(read.Flags, ", "), "-"))
 	}
 	if err := w.Flush(); err != nil {
 		fmt.Fprintf(stderr, "tasks repos: %v\n", err)

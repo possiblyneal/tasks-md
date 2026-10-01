@@ -206,7 +206,7 @@ func TestReposListsWhereEachLivesAndItsCounts(t *testing.T) {
 		t.Fatalf("tasks repos = %q, want a header and two Repos", out)
 	}
 	house := strings.Fields(lines[1])
-	if strings.Join(house, " ") != "house-move "+filepath.Join(code, "house-move")+" 0 1 2 0 1 0" {
+	if strings.Join(house, " ") != "house-move "+filepath.Join(code, "house-move")+" 0 1 2 0 1 0 not backed up" {
 		t.Errorf("house-move = %q", lines[1])
 	}
 	if !strings.HasPrefix(lines[2], "work") || !strings.Contains(lines[2], filepath.Join(elsewhere, "work")) {

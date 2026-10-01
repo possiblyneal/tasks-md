@@ -102,10 +102,12 @@ func (f *File) Color() string {
 	return ""
 }
 
-// Problem is one thing wrong with a file, at the line it is on.
+// Problem is one thing wrong with a file, at the line it is on. Lost says the
+// line could not be placed in any Task, so Write would drop it.
 type Problem struct {
 	Line    int    `json:"line"`
 	Message string `json:"message"`
+	Lost    bool   `json:"-"`
 }
 
 var (
@@ -137,7 +139,10 @@ func Parse(text string) (*File, []Problem) {
 	f := &File{}
 	var problems []Problem
 	problem := func(line int, format string, args ...any) {
-		problems = append(problems, Problem{line, fmt.Sprintf(format, args...)})
+		problems = append(problems, Problem{Line: line, Message: fmt.Sprintf(format, args...)})
+	}
+	lost := func(line int, message string) {
+		problems = append(problems, Problem{Line: line, Message: message, Lost: true})
 	}
 
 	var stack []*open // the Task each depth is currently under
@@ -158,7 +163,7 @@ func Parse(text string) (*File, []Problem) {
 			indent := len(m[1])
 			depth := indent / 2
 			if indent%2 != 0 || depth > len(stack) {
-				problem(n, "a Subtask indented past its parent")
+				lost(n, "a Subtask indented past its parent")
 				continue
 			}
 			if depth > maxDepth {
@@ -203,7 +208,7 @@ func Parse(text string) (*File, []Problem) {
 			}
 		}
 		if owner == nil || len(owner.task.Subtasks) > 0 {
-			problem(n, "cannot read this line as part of a Task")
+			lost(n, "cannot read this line as part of a Task")
 			continue
 		}
 		content := line[owner.indent+2:]
@@ -220,9 +225,7 @@ func Parse(text string) (*File, []Problem) {
 		o.task.Description = strings.TrimRight(strings.Join(o.desc, "\n"), "\n")
 		fixed(o, problem)
 	}
-	for _, t := range f.Tasks {
-		settle(t)
-	}
+	f.Settle()
 	for _, o := range all {
 		if len(o.task.Subtasks) > 0 && o.written != o.task.State {
 			problem(o.task.Line, "the line says %s, but its Subtasks make it %s", o.written, o.task.State)
@@ -315,6 +318,14 @@ func fixed(o *open, problem func(int, string, ...any)) {
 	}
 	if at := slices.Index(o.labels, "id"); at >= 0 && !idForm.MatchString(o.task.ID) {
 		problem(o.lines[at], "id %q is not four lowercase letters or digits", o.task.ID)
+	}
+}
+
+// Settle works out every parent's State from its Subtasks again, after a
+// write has changed one of them.
+func (f *File) Settle() {
+	for _, t := range f.Tasks {
+		settle(t)
 	}
 }
 

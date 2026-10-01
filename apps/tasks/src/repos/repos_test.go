@@ -99,15 +99,15 @@ func TestFindSaysWhenARootIsNotThere(t *testing.T) {
 	}
 }
 
-func TestRoots(t *testing.T) {
+func TestLoad(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config")
 
-	roots, err := Roots(path)
-	if err != nil || len(roots) != 1 || roots[0] != filepath.Join(home, "code") {
-		t.Errorf("no config: roots = %q, %v; want [%s]", roots, err, filepath.Join(home, "code"))
+	c, err := Load(path)
+	if err != nil || len(c.Roots) != 1 || c.Roots[0] != filepath.Join(home, "code") || c.Name != "" {
+		t.Errorf("no config: %+v, %v; want roots [%s] and no name", c, err, filepath.Join(home, "code"))
 	}
 
 	write := func(text string) {
@@ -116,15 +116,15 @@ func TestRoots(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write("# where Repos live\nroot = ~/code\n\nroot = /srv/house\n")
-	roots, err = Roots(path)
-	if err != nil || strings.Join(roots, " ") != filepath.Join(home, "code")+" /srv/house" {
-		t.Errorf("roots = %q, %v", roots, err)
+	write("# where Repos live\nroot = ~/code\n\nroot = /srv/house\nname = neal\n")
+	c, err = Load(path)
+	if err != nil || strings.Join(c.Roots, " ") != filepath.Join(home, "code")+" /srv/house" || c.Name != "neal" {
+		t.Errorf("config = %+v, %v", c, err)
 	}
 
 	for _, bad := range []string{"roots: ~/code\n", "colour = red\n", "root = relative/path\n"} {
 		write(bad)
-		if _, err := Roots(path); err == nil || !strings.Contains(err.Error(), "line 1") {
+		if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "line 1") {
 			t.Errorf("config %q: err = %v, want one naming line 1", bad, err)
 		}
 	}

@@ -6,6 +6,8 @@
 //	# one root a line; ~ is the home directory
 //	root = ~/code
 //	root = ~/house-move
+//	# the Actor this host's writes are made as
+//	name = neal
 //
 // No file, or a file naming no root, means one root, ~/code. Blank lines and
 // lines starting with # are ignored, and any other key is an error.
@@ -42,20 +44,27 @@ func ConfigPath() (string, error) {
 	return filepath.Join(dir, "tasks", "config"), nil
 }
 
-// Roots reads the roots from the config file at path.
-func Roots(path string) ([]string, error) {
+// Config is what the config file says: the roots Repos are found under, and
+// the name writes from this host are made as, "" when it gives none.
+type Config struct {
+	Roots []string
+	Name  string
+}
+
+// Load reads the config file at path.
+func Load(path string) (Config, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return nil, err
+		return Config{}, err
 	}
-	fallback := []string{filepath.Join(home, "code")}
+	c := Config{Roots: []string{filepath.Join(home, "code")}}
 
 	file, err := os.Open(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return fallback, nil
+		return c, nil
 	}
 	if err != nil {
-		return nil, err
+		return Config{}, err
 	}
 	defer file.Close()
 
@@ -68,24 +77,28 @@ func Roots(path string) ([]string, error) {
 		}
 		key, value, ok := strings.Cut(line, "=")
 		key, value = strings.TrimSpace(key), strings.TrimSpace(value)
+		if ok && key == "name" && value != "" {
+			c.Name = value
+			continue
+		}
 		if !ok || key != "root" {
-			return nil, fmt.Errorf("%s line %d: want `root = <path>`", path, n)
+			return Config{}, fmt.Errorf("%s line %d: want `root = <path>` or `name = <actor>`", path, n)
 		}
 		if rest, ok := strings.CutPrefix(value, "~"); ok {
 			value = home + rest
 		}
 		if !filepath.IsAbs(value) {
-			return nil, fmt.Errorf("%s line %d: %q is not an absolute path or one under ~", path, n, value)
+			return Config{}, fmt.Errorf("%s line %d: %q is not an absolute path or one under ~", path, n, value)
 		}
 		roots = append(roots, filepath.Clean(value))
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return Config{}, err
 	}
-	if len(roots) == 0 {
-		return fallback, nil
+	if len(roots) > 0 {
+		c.Roots = roots
 	}
-	return roots, nil
+	return c, nil
 }
 
 // Find scans the roots afresh: each root's direct children that hold a

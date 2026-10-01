@@ -33,6 +33,8 @@ var verbs = []struct {
 	{"list", list},
 	{"repos", listRepos},
 	{"lint", lint},
+	{"add", add},
+	{"move", move},
 }
 
 // usage is bare `tasks`: what the binary does and how to reach it. It is an
@@ -66,6 +68,7 @@ func runAPI(args []string, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
+	o.Actor = actor()
 	if err := api.ListenAndServe(o, stderr); err != nil {
 		fmt.Fprintf(stderr, "tasks api: %v\n", err)
 		return 1

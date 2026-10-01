@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/possiblyneal/tasks-md/apps/tasks/src/history"
 	"github.com/possiblyneal/tasks-md/apps/tasks/src/repos"
 	"github.com/possiblyneal/tasks-md/apps/tasks/src/taskfile"
 )
@@ -64,6 +65,9 @@ type Repo struct {
 	Color    string             `json:"color"`
 	Tasks    []Task             `json:"tasks"`
 	Problems []taskfile.Problem `json:"problems"`
+	// Flags is what the Repo's tasks history is marked with: not pushed, not
+	// backed up, or why it refuses writes.
+	Flags []string `json:"flags"`
 }
 
 // Board is a whole read as `tasks list -json` prints it and GET /api/state
@@ -95,11 +99,25 @@ func Discover() ([]repos.Repo, []error) {
 	if err != nil {
 		return nil, []error{err}
 	}
-	roots, err := repos.Roots(path)
+	c, err := repos.Load(path)
 	if err != nil {
 		return nil, []error{err}
 	}
-	return repos.Find(roots)
+	return repos.Find(c.Roots)
+}
+
+// Named is the one Repo with the name, found afresh, for a write to act on.
+// The config errors met finding it are the reads' to report, not a write's.
+func Named(name string) (repos.Repo, error) {
+	found, _ := Discover()
+	if name == "" {
+		return repos.Repo{}, NoRepo(name)
+	}
+	only, err := Only(found, name)
+	if err != nil {
+		return repos.Repo{}, err
+	}
+	return only[0], nil
 }
 
 // Read reads every Repo found, narrowed. Every Repo is in the result, holding
@@ -140,7 +158,7 @@ func Only(found []repos.Repo, name string) ([]repos.Repo, error) {
 // problem on line 0 rather than an error, so one broken Repo never hides the
 // rest.
 func ReadRepo(r repos.Repo) Repo {
-	out := Repo{Name: r.Name, Path: r.Path, Tasks: []Task{}, Problems: []taskfile.Problem{}}
+	out := Repo{Name: r.Name, Path: r.Path, Tasks: []Task{}, Problems: []taskfile.Problem{}, Flags: history.Flags(r.Path)}
 	text, err := os.ReadFile(r.File())
 	if err != nil {
 		out.Problems = append(out.Problems, taskfile.Problem{Message: "cannot read tasks.md: " + unwrapped(err)})

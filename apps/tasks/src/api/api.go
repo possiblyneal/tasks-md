@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 
 	"github.com/possiblyneal/tasks-md/apps/tasks/src/board"
+	"github.com/possiblyneal/tasks-md/apps/tasks/src/write"
 )
 
 // Options is how the listener is configured. Web is the directory of compiled
@@ -29,16 +30,26 @@ import (
 // Browse is the directory the file picker lists from and will not look above.
 // Empty is the home directory of the user running `tasks api`, which is the
 // machine a pointer's relative path resolves against.
+//
+// Actor is who every write through the listener is made as, resolved once
+// when it starts.
 type Options struct {
 	Addr   string
 	Web    string
 	Browse string
+	Actor  string
 }
 
 // Handler is every route, and it is what a test exercises without a listener.
 func Handler(o Options) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/state", state)
+	mux.HandleFunc("POST /api/tasks", func(w http.ResponseWriter, r *http.Request) {
+		add(o.Actor, w, r)
+	})
+	mux.HandleFunc("POST /api/tasks/{id}/move", func(w http.ResponseWriter, r *http.Request) {
+		move(o.Actor, w, r)
+	})
 	// The one route reading outside the Repos. It lists and never opens, and
 	// what it lists is the machine a pointer resolves against rather than the
 	// phone the pointer is being typed into.
@@ -108,17 +119,21 @@ func send(w http.ResponseWriter, status int, body any) {
 }
 
 // fail maps an error onto the status carrying the meaning the CLI's exit
-// status carries: a bad request is not a failure, and neither is a missing
-// Repo.
+// status carries: a bad request is not a failure, neither is a missing Repo or
+// Task, and a write the rules turn away is a conflict.
 // The body is the sentence the CLI would have printed.
 func fail(w http.ResponseWriter, err error) {
 	status := http.StatusInternalServerError
 	var asked usage
+	var invalid write.Invalid
 	var absent board.NoRepo
+	var noTask write.NoTask
 	switch {
-	case errors.As(err, &asked):
+	case write.IsRefused(err):
+		status = http.StatusConflict
+	case errors.As(err, &asked), errors.As(err, &invalid):
 		status = http.StatusBadRequest
-	case errors.As(err, &absent):
+	case errors.As(err, &absent), errors.As(err, &noTask):
 		status = http.StatusNotFound
 	}
 	send(w, status, map[string]string{"error": err.Error()})

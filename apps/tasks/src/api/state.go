@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/possiblyneal/tasks-md/apps/tasks/src/board"
+	"github.com/possiblyneal/tasks-md/apps/tasks/src/history"
 	"github.com/possiblyneal/tasks-md/apps/tasks/src/repos"
 	"github.com/possiblyneal/tasks-md/apps/tasks/src/taskfile"
 )
@@ -81,7 +82,7 @@ func narrowing(r *http.Request) (board.Narrowing, error) {
 }
 
 // version is the ETag: every Repo found, its file's modification time and
-// size, the config errors, and the query, hashed. Any of them changing is a
+// size, its flags, the config errors, and the query, hashed. Any of them changing is a
 // different response, so none can be answered 304 for another. A file that
 // cannot be stat'd hashes as such and is read, and reported, by the read.
 func version(found []repos.Repo, errs []error, query string) string {
@@ -91,7 +92,8 @@ func version(found []repos.Repo, errs []error, query string) string {
 		if info, err := os.Stat(r.File()); err == nil {
 			fmt.Fprintf(h, "%d\x00%d", info.ModTime().UnixNano(), info.Size())
 		}
-		fmt.Fprintln(h)
+		// A push going through changes no file, and is still news.
+		fmt.Fprintln(h, "\x00"+strings.Join(history.Flags(r.Path), "\x00"))
 	}
 	for _, err := range errs {
 		fmt.Fprintln(h, err)
