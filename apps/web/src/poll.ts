@@ -22,9 +22,11 @@ const POLL_MS = 1000
 export function usePoll(narrowing: Narrowing | null): {
   board: Board | null
   error: string | null
+  offline: boolean
 } {
   const [read, setRead] = useState<{ query: string; board: Board } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [offline, setOffline] = useState(false)
 
   useEffect(() => {
     if (!narrowing) return
@@ -41,6 +43,8 @@ export function usePoll(narrowing: Narrowing | null): {
           etag = snapshot.etag
           setRead({ query, board: snapshot.board })
         }
+        // A 304 came from the server, so it is as live as a whole board is.
+        setOffline(snapshot?.offline ?? false)
         setError(null)
       } catch (caught) {
         if (controller.signal.aborted) return
@@ -49,6 +53,9 @@ export function usePoll(narrowing: Narrowing | null): {
         // that failed to draw.
         etag = null
         setError(sentence(caught))
+        // A fetch rejects with a TypeError only when the request never reached
+        // a server, which with no board kept is what away from home looks like.
+        setOffline(caught instanceof TypeError)
       }
     }
 
@@ -72,5 +79,9 @@ export function usePoll(narrowing: Narrowing | null): {
 
   const current =
     narrowing && read?.query === queryString(narrowing) ? read.board : null
-  return { board: current, error: narrowing ? error : null }
+  return {
+    board: current,
+    error: narrowing ? error : null,
+    offline: narrowing ? offline : false,
+  }
 }

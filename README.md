@@ -60,6 +60,8 @@ systemctl --user enable --now tasks-api.service
 
 The client is then at `https://tasks.lan`, where Traefik on `server` ends TLS with the `Homelab CA` `*.lan` leaf and forwards to `:8080` (the route and the certificate live in the homelab repo). Plain `http://<host>:8080` still answers but is not the address to give out, since the installed board's service worker needs HTTPS; and `tasks <verb>` at the terminal reads the same Repos: the service and a verb both read `~/.config/tasks/config`.
 
+On an iPhone, open `https://tasks.lan` in Safari and choose Add to Home Screen from the Share sheet. The installed board opens standalone, and away from home Wi-Fi it shows the last board it read, read-only, until `tasks.lan` answers again.
+
 `:8080` is a wildcard bind, so the listener is reachable on every interface the host has; ADR 0003 puts it on the LAN with no authentication, and the network is what keeps it there. To narrow it, override `ExecStart` in a drop-in rather than editing the shipped unit — and clear it with a bare `ExecStart=` first. Without that line the drop-in appends, and a `Type=simple` unit with two `ExecStart=` settings is refused at load: `daemon-reload` reports a bad unit file setting and the service does not start at all.
 
 ```sh

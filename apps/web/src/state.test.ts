@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest'
 
+import { OFFLINE } from './offline'
 import { fetchState, queryString, WIDE } from './state'
 
 // What the last call asked for, which is how the conditional request is
@@ -52,6 +53,18 @@ test('a read returns the board and the tag it came with', async () => {
   expect(snapshot?.etag).toBe('"abc"')
   expect(snapshot?.board.repos[0]?.name).toBe('work')
   expect(asked?.headers).toEqual({})
+  expect(snapshot?.offline).toBe(false)
+})
+
+// The service worker answers a read it could not get from the server with the
+// last board it kept, and marks it, so the board knows it is not live.
+test('a board the service worker kept is read as offline', async () => {
+  vi.stubGlobal(
+    'fetch',
+    answering(200, { repos: [], errors: [] }, { [OFFLINE]: '1' }),
+  )
+
+  expect((await fetchState(WIDE, null))?.offline).toBe(true)
 })
 
 test('unchanged files are nothing to redraw rather than an empty board', async () => {

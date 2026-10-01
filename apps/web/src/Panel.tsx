@@ -28,6 +28,7 @@ export function Panel({
   onEdit,
   onDelete,
   onClose,
+  offline,
 }: {
   /** The Repo's wide read, in file order, so the whole tree is in it. */
   repo: Repo
@@ -38,6 +39,8 @@ export function Panel({
   /** Deletes the Task, its Subtasks with it, and rejects with a refusal. */
   onDelete: () => Promise<void>
   onClose: () => void
+  /** Offline, the panel still reads but neither edits nor deletes. */
+  offline: boolean
 }) {
   // The first tap on Delete asks; the second deletes. No browser dialog,
   // which would block the page.
@@ -86,12 +89,18 @@ export function Panel({
         aria-labelledby="panel-title"
       >
         <div className="panel-bar">
-          <button type="button" className="control" onClick={onEdit}>
+          <button
+            type="button"
+            className="control"
+            disabled={offline}
+            onClick={onEdit}
+          >
             Edit
           </button>
           <button
             type="button"
             className="control"
+            disabled={offline}
             onClick={() => void remove()}
           >
             {sure ? 'Delete it and its Subtasks' : 'Delete'}

@@ -17,6 +17,7 @@ import {
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 import { App } from './App'
+import { OFFLINE } from './offline'
 import { answering, asked, BOARD, task } from './testing'
 
 beforeEach(() => {
@@ -447,4 +448,75 @@ test('Delete takes a second tap, then deletes and closes the panel', async () =>
       body: { repo: 'house-move', version: 'v0' },
     },
   ])
+})
+
+// Away from home Wi-Fi the service worker answers with the last board it kept,
+// marked offline: one flag per poll here, the last repeated.
+function away(...offline: boolean[]) {
+  vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+    asked.push({ url, init })
+    const marked = offline[Math.min(asked.length, offline.length) - 1]
+    return Promise.resolve(
+      new Response(JSON.stringify(BOARD), {
+        headers: { ETag: '"1"', ...(marked ? { [OFFLINE]: '1' } : {}) },
+      }),
+    )
+  })
+}
+
+test('offline, the last board read is drawn and says it is offline', async () => {
+  away(true)
+  render(<App />)
+
+  await screen.findByText('Wrap glassware')
+  expect(screen.getByRole('status').textContent).toMatch(/offline/i)
+})
+
+test('offline, a card can be neither dragged nor held into a move', async () => {
+  away(true)
+  render(<App />)
+  await screen.findByRole('status')
+  const card = within(lane('Doing')).getByRole('article')
+
+  expect(card.getAttribute('draggable')).toBe('false')
+  await hold(card)
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(writes()).toEqual([])
+})
+
+test('offline, nothing adds, edits or deletes', async () => {
+  away(true)
+  render(<App />)
+  await screen.findByRole('status')
+
+  expect(screen.getByRole('button', { name: 'Add' })).toHaveProperty(
+    'disabled',
+    true,
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Wrap glassware' }))
+  for (const name of ['Edit', 'Delete']) {
+    expect(screen.getByRole('button', { name })).toHaveProperty(
+      'disabled',
+      true,
+    )
+  }
+})
+
+test('a read that cannot reach the server at all is offline too', async () => {
+  vi.stubGlobal('fetch', () => Promise.reject(new TypeError('Load failed')))
+  render(<App />)
+
+  expect((await screen.findByRole('status')).textContent).toMatch(/offline/i)
+})
+
+test('back online, the board reads fresh without a reload', async () => {
+  away(true, false)
+  render(<App />)
+  await screen.findByRole('status')
+
+  await waitFor(() => expect(screen.queryByRole('status')).toBeNull(), {
+    timeout: 2500,
+  })
+  const card = within(lane('Doing')).getByRole('article')
+  expect(card.getAttribute('draggable')).toBe('true')
 })

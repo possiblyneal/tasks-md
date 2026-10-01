@@ -13,7 +13,8 @@ Repo, drawn from `GET /api/state`, with Repo and Tag chips, a search box, a
 sort picker, a panel a card opens into, which shows a Series' next dates, a move, by dragging a card to a lane at
 a desk or holding it on a phone for Move to, and the add/edit form with
 delete. The box and the breakdown are kept unmounted for #123, which brings
-the Broker routes back.
+the Broker routes back. It installs to an
+iPhone's home screen as a PWA, and offline shows the last board read.
 
 ## Ownership
 
@@ -48,7 +49,16 @@ the Broker routes back.
   `today`.
 - `src/Box.tsx`, `src/Breakdown.tsx` — the dump box and the breakdown,
   unmounted until #123.
-- `src/main.tsx` — the mount, and nothing else.
+- `src/main.tsx` — the mount, and the service worker's registration in a
+  build.
+- `src/offline.ts` — what the service worker answers each request with, and
+  `keep`, which holds the page and the files it loads. `OFFLINE` is the header
+  a board read answered from the cache carries, which `fetchState` reads.
+- `src/sw.ts` — the service worker's wiring, built to `/sw.js`.
+- `src/public/` — Vite's `publicDir`, copied to the build's root unhashed:
+  `manifest.json` and the icons. `icon.svg` is the source; the PNGs are
+  `rsvg-convert -w <n> -h <n> icon.svg -o icon-<n>.png` for 180 (the
+  `apple-touch-icon` Safari's home screen reads), 192 and 512.
 - `src/App.test.tsx`, `src/Narrow.test.tsx`, `src/Panel.test.tsx`,
   `src/Series.test.tsx`,
   `src/Box.test.tsx`, `src/Sheet.test.tsx`, `src/Breakdown.test.tsx` — the
@@ -56,6 +66,8 @@ the Broker routes back.
   mocked fetch the board's tests share.
 - `src/state.test.ts`, `src/write.test.ts` — what a Narrowing becomes as a
   query, what a read does with a `304` and a refusal, and what a write sends.
+- `src/offline.test.ts` — what the service worker answers, with a Map for the
+  Cache and a fetch that reaches the server or does not.
 - `src/index.css` — the whole of the styling. There is no component-level
   stylesheet and no CSS-in-JS, so the 44px rule below is checkable by reading
   one file.
@@ -146,6 +158,26 @@ up` or why it refuses writes, as the read carries them in `flags`.
 - **A question is asked about the Tasks the read asked for.** `ask` and
   `fetchState` both build their query from a Narrowing through `queryString`,
   so a narrowing added there is on both.
+- **Offline, the board is the last one read, and nothing on it writes.** The
+  service worker answers navigations from the network and falls back to the
+  kept page; the files under `/assets/` from the cache first (Vite hashes their
+  names); and `GET /api/state` from the network, keeping each `200` under its
+  URL and falling back to it marked `X-Tasks-Offline`. A read whose tag is not
+  the kept board's is asked without one, or the reads after the worker takes
+  the page would all be `304` and nothing would be kept. Writes are never
+  intercepted. The page is offline while the last poll was answered from the
+  cache or never reached a server (a `TypeError`); it says so in a
+  `role="status"` line and disables every write control: no drag, no hold,
+  no Move to, no Add, no Edit or Delete in the panel. A write control added
+  later (#123's box and Break down) reads the same `offline` and is disabled
+  under it. The next poll that
+  reaches the server ends it, with no reload.
+- **The worker is a module, and every chunk the page loads is in
+  `index.html`.** `sw.js` imports the chunk it shares with the page, which
+  Safari allows from iOS 15. `keep` finds what to hold by reading `/assets/`
+  paths out of the page, which works because Vite lists each static chunk as
+  a `modulepreload`; a lazy `import()` would be missed and must not be added
+  without changing that.
 - **Touch targets no smaller than 44px, one thumb, no hover — at every width.**
   On a phone each lane is most of a screen wide and they scroll across,
   snapping one at a time with the next one's edge in view; from 64rem the six
@@ -159,8 +191,9 @@ up` or why it refuses writes, as the read carries them in `flags`.
 - The npm scripts here are the interface `scripts/libs/detect.sh` dispatches
   node on, through the root workspace manifest. A script renamed here goes
   unrun and reports `unavailable`, which fails the gate.
-- No `public/`: `scripts/structure` reads a folder under a unit that is neither
-  `src/` nor a scoped folder as a domain and requires a `src/` inside it.
+- No `apps/web/public/`: `scripts/structure` reads a folder under a unit that
+  is neither `src/` nor a scoped folder as a domain and requires a `src/`
+  inside it. That is why `publicDir` is `src/public`.
 - The screens #119 deleted (collections, activity, the log) are in git
   history.
 

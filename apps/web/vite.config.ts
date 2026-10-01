@@ -7,6 +7,20 @@ import { defineConfig } from 'vitest/config'
 // fetch during development would go to Vite's port and find no API there.
 export default defineConfig({
   plugins: [react()],
+  // Copied to the root of the build as they are: the manifest and the icons a
+  // home screen reads by fixed names.
+  publicDir: 'src/public',
+  // The service worker is built beside the page rather than under `assets/`,
+  // and unhashed, because its path is its scope and what the page registers.
+  build: {
+    rollupOptions: {
+      input: { index: 'index.html', sw: 'src/sw.ts' },
+      output: {
+        entryFileNames: (chunk) =>
+          chunk.name === 'sw' ? 'sw.js' : 'assets/[name]-[hash].js',
+      },
+    },
+  },
   // 0.0.0.0 because the surface being proven here is a phone on the LAN
   // reaching this machine, which the default loopback bind refuses.
   server: {
