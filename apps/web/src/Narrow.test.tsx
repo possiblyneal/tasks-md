@@ -138,3 +138,18 @@ test('the sort picker offers the served sorts and sends the one picked', async (
   await waitFor(() => expect(asked.length).toBeGreaterThan(0))
   expect(urls().every((url) => url === '/api/state')).toBe(true)
 })
+
+// Blocked is in, out, or all there is, as `-unblocked` and `-blocked` say.
+test('the Blocked picker asks for Blocked Tasks alone or leaves them out', async () => {
+  render(<App />)
+  await screen.findByText('Wrap glassware')
+
+  const picker = screen.getByRole('combobox', { name: 'Blocked' })
+  expect((picker as HTMLSelectElement).value).toBe('')
+
+  fireEvent.change(picker, { target: { value: 'only' } })
+  await waitFor(() => expect(urls()).toContain('/api/state?blocked=true'))
+
+  fireEvent.change(picker, { target: { value: 'out' } })
+  await waitFor(() => expect(urls()).toContain('/api/state?unblocked=true'))
+})

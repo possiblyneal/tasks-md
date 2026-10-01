@@ -118,6 +118,8 @@ export type Narrowing = {
   tags: string[]
   search: string
   unblocked: boolean
+  /** Every Task but the Blocked ones left out; never with `unblocked`. */
+  blocked: boolean
   /** One of the served `sorts`; empty is file order. */
   sort: string
 }
@@ -129,6 +131,7 @@ export const WIDE: Narrowing = {
   tags: [],
   search: '',
   unblocked: false,
+  blocked: false,
   sort: '',
 }
 
@@ -144,6 +147,7 @@ export function queryString({
   tags,
   search,
   unblocked,
+  blocked,
   sort,
 }: Narrowing): string {
   const query = new URLSearchParams()
@@ -152,6 +156,7 @@ export function queryString({
   for (const tag of tags) query.append('tag', tag)
   if (search) query.set('search', search)
   if (unblocked) query.set('unblocked', 'true')
+  if (blocked) query.set('blocked', 'true')
   if (sort && sort !== 'file') query.set('sort', sort)
   const written = query.toString()
   return written ? `?${written}` : ''

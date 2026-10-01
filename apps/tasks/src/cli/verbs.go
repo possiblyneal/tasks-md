@@ -53,6 +53,7 @@ func list(args []string, stdout, stderr io.Writer) int {
 	fs.Var(&tags, "tag", "only Tasks carrying this Tag, repeatable")
 	fs.StringVar(&n.Search, "search", "", "only Tasks whose id, title or description holds this text")
 	fs.BoolVar(&n.Unblocked, "unblocked", false, "leave Blocked Tasks out")
+	fs.BoolVar(&n.Blocked, "blocked", false, "only Blocked Tasks")
 	sort := fs.String("sort", string(board.SortFile), "order siblings by one of: "+strings.Join(sortWords(), ", "))
 	asJSON := fs.Bool("json", false, "print JSON")
 	if err := fs.Parse(args); err != nil {

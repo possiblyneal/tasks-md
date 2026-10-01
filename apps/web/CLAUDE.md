@@ -10,7 +10,7 @@ records why the surface moved off the terminal.
 
 What it holds today: the board, six State lanes of leaf-Task cards over every
 Repo, drawn from `GET /api/state`, with Repo and Tag chips, a search box, a
-sort picker, the weekly metrics, a panel a card opens into, which shows a Series' next dates and the Task's history, a move, by dragging a card to a lane at
+sort picker, a Blocked picker, the weekly metrics, a panel a card opens into, which shows a Series' next dates and the Task's history, a move, by dragging a card to a lane at
 a desk or holding it on a phone for Move to, the add/edit form with
 delete, the box pinned under the board that hands a dump or a question to
 the Broker, and Break down in the panel. It installs to an
@@ -47,7 +47,7 @@ iPhone's home screen as a PWA, and offline shows the last board read.
   `main.tsx` mounts.
 - `src/poll.ts` — `usePoll`, the once-a-second read of `GET /api/state` under
   one Narrowing.
-- `src/Narrow.tsx` — the Repo chips, Tag chips, search box and sort picker.
+- `src/Narrow.tsx` — the Repo chips, Tag chips, search box, sort picker and Blocked picker (with, alone, without).
 - `src/Panel.tsx` — the panel: every attribute, the parent with its leaf
   counts per State, the Subtasks, its history, and Edit, Delete and Break down.
 - `src/Sheet.tsx` — the add/edit form, and the file picker for attachments.

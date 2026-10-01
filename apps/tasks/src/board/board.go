@@ -28,11 +28,16 @@ type Narrowing struct {
 	Tags      []string
 	Search    string
 	Unblocked bool // leave Blocked Tasks out
+	Blocked   bool // leave every Task but the Blocked ones out
 	Sort      Sort // empty is file order
 }
 
-// Check refuses a Narrowing naming a State or a Sort there is not.
+// Check refuses a Narrowing naming a State or a Sort there is not, or asking
+// for Blocked Tasks both in and out.
 func (n Narrowing) Check() error {
+	if n.Blocked && n.Unblocked {
+		return errors.New("ask for the Blocked Tasks alone or leave them out, not both")
+	}
 	for _, s := range n.States {
 		if !slices.Contains(taskfile.States, s) {
 			return fmt.Errorf("%q is not a State: want one of %v", s, taskfile.States)
@@ -312,7 +317,7 @@ func (n Narrowing) keeps(t Task) bool {
 	if len(n.Tags) > 0 && !slices.ContainsFunc(n.Tags, func(tag string) bool { return slices.Contains(t.Tags, tag) }) {
 		return false
 	}
-	if n.Unblocked && t.Blocked {
+	if n.Unblocked && t.Blocked || n.Blocked && !t.Blocked {
 		return false
 	}
 	if n.Search != "" {

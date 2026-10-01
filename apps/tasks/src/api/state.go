@@ -76,12 +76,14 @@ func narrowing(r *http.Request) (board.Narrowing, error) {
 			n.Tags = append(n.Tags, tag)
 		}
 	}
-	if asked := q.Get("unblocked"); asked != "" {
-		unblocked, err := strconv.ParseBool(asked)
-		if err != nil {
-			return n, usage{fmt.Errorf("cannot read unblocked=%q: want true or false", asked)}
+	for name, to := range map[string]*bool{"unblocked": &n.Unblocked, "blocked": &n.Blocked} {
+		if asked := q.Get(name); asked != "" {
+			on, err := strconv.ParseBool(asked)
+			if err != nil {
+				return n, usage{fmt.Errorf("cannot read %s=%q: want true or false", name, asked)}
+			}
+			*to = on
 		}
-		n.Unblocked = unblocked
 	}
 	if err := n.Check(); err != nil {
 		return n, usage{err}

@@ -114,6 +114,7 @@ func TestListNarrows(t *testing.T) {
 		{[]string{"-tag", "writing", "-tag", "packing"}, []string{"m3qa", "r3pt"}},
 		{[]string{"-search", "GLASS"}, []string{"m3qa", "m3qc"}},
 		{[]string{"-unblocked"}, []string{"m3qa", "m3qb", "m3qc", "r3pt"}},
+		{[]string{"-blocked"}, []string{"v9t1"}},
 	}
 	for _, c := range cases {
 		t.Run(strings.Join(c.args, " "), func(t *testing.T) {
@@ -290,6 +291,9 @@ func TestListRefusesWhatItCannotAnswer(t *testing.T) {
 	}
 	if code, _, errs := run(t, "list", "-state", "someday"); code != 2 || !strings.Contains(errs, "someday") {
 		t.Errorf("an unknown State exited %d (%s), want 2 naming it", code, errs)
+	}
+	if code, _, errs := run(t, "list", "-blocked", "-unblocked"); code != 2 || !strings.Contains(errs, "Blocked") {
+		t.Errorf("-blocked with -unblocked exited %d saying %q, want 2 naming the clash", code, errs)
 	}
 }
 

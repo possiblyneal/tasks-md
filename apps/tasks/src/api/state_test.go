@@ -129,6 +129,7 @@ func TestStateNarrowsTheWayTasksListDoes(t *testing.T) {
 		"?tag=kitchen":                 1,
 		"?search=VAN":                  1,
 		"?unblocked=true":              3,
+		"?blocked=true":                1,
 		"?repo=house-move&state=inbox": 0,
 		"?repo=&tag=&search=&state=":   -1, // an empty parameter narrows nothing
 		"?repo=house-move&unblocked=1": 2,
@@ -177,10 +178,12 @@ func TestStateRefusesWhatItCannotAnswer(t *testing.T) {
 	homeWith(t, map[string]string{"work": work})
 	h := Handler(Options{})
 	for query, status := range map[string]int{
-		"?repo=nowhere":    http.StatusNotFound,
-		"?state=someday":   http.StatusBadRequest,
-		"?unblocked=maybe": http.StatusBadRequest,
-		"?sort=colour":     http.StatusBadRequest,
+		"?repo=nowhere":                http.StatusNotFound,
+		"?state=someday":               http.StatusBadRequest,
+		"?unblocked=maybe":             http.StatusBadRequest,
+		"?blocked=maybe":               http.StatusBadRequest,
+		"?blocked=true&unblocked=true": http.StatusBadRequest,
+		"?sort=colour":                 http.StatusBadRequest,
 	} {
 		w := get(t, h, "/api/state"+query, http.Header{"If-None-Match": {"*"}})
 		if w.Code != status || !strings.Contains(w.Body.String(), `"error"`) {

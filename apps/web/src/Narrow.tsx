@@ -1,5 +1,5 @@
-// The controls over the board: Repo chips, Tag chips, one search box and one
-// sort picker. Nothing here filters anything. Each control sets one field of
+// The controls over the board: Repo chips, Tag chips, one search box, one
+// sort picker and one Blocked picker. Nothing here filters anything. Each control sets one field of
 // the Narrowing and the next read asks the server again, so the lanes hold
 // what `tasks list` would print under the same flags rather than what this
 // side sifted.
@@ -50,6 +50,24 @@ export function Narrow({
             {sort}
           </option>
         ))}
+      </select>
+      {/* Blocked Tasks with the rest, alone, or left out: `tasks list` with
+          neither flag, `-blocked` or `-unblocked`. */}
+      <select
+        className="control"
+        aria-label="Blocked"
+        value={narrowing.blocked ? 'only' : narrowing.unblocked ? 'out' : ''}
+        onChange={(event) =>
+          onChange({
+            ...narrowing,
+            blocked: event.target.value === 'only',
+            unblocked: event.target.value === 'out',
+          })
+        }
+      >
+        <option value="">with Blocked</option>
+        <option value="only">Blocked only</option>
+        <option value="out">without Blocked</option>
       </select>
 
       {/* One Repo at a time, because a read names one Repo or every Repo:

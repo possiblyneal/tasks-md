@@ -113,11 +113,13 @@ test('each narrowing is sent under the name the route reads it by', () => {
       tags: ['kitchen', 'van'],
       search: '50% off',
       unblocked: true,
+      blocked: false,
       sort: 'deadline',
     }),
   ).toBe(
     '?repo=work&state=doing&state=inbox&tag=kitchen&tag=van&search=50%25+off&unblocked=true&sort=deadline',
   )
+  expect(queryString({ ...WIDE, blocked: true })).toBe('?blocked=true')
 })
 
 // File order is what the read gives when no sort is named, so naming it is a
