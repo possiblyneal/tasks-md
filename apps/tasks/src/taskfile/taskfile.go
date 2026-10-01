@@ -59,12 +59,15 @@ type Attr struct {
 // Task is one title line and everything indented under it.
 //
 // State is the State that counts: the checkbox over the word, and for a
-// parent the State worked out from its Subtasks. Line is the title's line
-// number, counted from 1.
+// parent the State worked out from its Subtasks. Written is a parent's State
+// as its line said it when that disagreed, and "" otherwise: Write gives the
+// line back as it was, so a hand edit stays in view rather than being
+// rewritten. Line is the title's line number, counted from 1.
 type Task struct {
 	Line        int
 	Title       string
 	State       State
+	Written     State
 	Tags        []string
 	ID          string
 	Created     string
@@ -231,6 +234,7 @@ func Parse(text string) (*File, []Problem) {
 	for _, o := range all {
 		if len(o.task.Subtasks) > 0 && o.written != o.task.State {
 			problem(o.task.Line, "the line says %s, but its Subtasks make it %s", o.written, o.task.State)
+			o.task.Written = o.written
 		}
 	}
 	references(all, problem)
@@ -401,14 +405,18 @@ func Version(t *Task) string {
 }
 
 func write(b *strings.Builder, t *Task, indent string) {
+	said := t.State
+	if t.Written != "" && len(t.Subtasks) > 0 {
+		said = t.Written
+	}
 	box := " "
-	switch t.State {
+	switch said {
 	case Done:
 		box = "x"
 	case Declined:
 		box = "-"
 	}
-	fmt.Fprintf(b, "%s- [%s] %s | %s", indent, box, t.Title, t.State)
+	fmt.Fprintf(b, "%s- [%s] %s | %s", indent, box, t.Title, said)
 	for _, tag := range t.Tags {
 		b.WriteString(" #" + tag)
 	}

@@ -230,8 +230,10 @@ func TestWriteRewritesAHandEditCanonically(t *testing.T) {
 	hand := "- [x]  Ticked   | doing #a\n  - id: aaaa\n  - created: 2026-09-20\n\n\n" +
 		"- [ ] Parent | done\n  - id: bbbb\n  - created: 2026-09-20\n" +
 		"  - [ ] Child\n    - id: cccc\n    - created: 2026-09-20\n"
+	// The parent's line disagrees with its Child, so it keeps what it said, in
+	// canonical form: an open box over an ended word reads as Backlog.
 	want := "- [x] Ticked | done #a\n  - id: aaaa\n  - created: 2026-09-20\n" +
-		"- [ ] Parent | inbox\n  - id: bbbb\n  - created: 2026-09-20\n" +
+		"- [ ] Parent | backlog\n  - id: bbbb\n  - created: 2026-09-20\n" +
 		"  - [ ] Child | inbox\n    - id: cccc\n    - created: 2026-09-20\n"
 	f, _ := Parse(header + hand)
 	if got := Write(f); got != header+want {
@@ -259,5 +261,31 @@ func TestVersionFollowsTheWholeTreeAndNothingElse(t *testing.T) {
 	moved, _ := Parse("# Tasks\n\nA new preamble line.\n\n" + text[len("# Tasks\n\n"):])
 	if Version(moved.Tasks[1]) != van {
 		t.Errorf("a tree's version changed with its line number")
+	}
+}
+
+// A parent line a hand edit set against its Subtasks is written back as it
+// was, so the problem stays in view until a person fixes the line.
+func TestAParentLineThatDisagreesIsWrittenBackAsWritten(t *testing.T) {
+	text := `# Tasks
+
+- [x] Pack the kitchen | done
+  - id: m3qa
+  - created: 2026-09-20
+  - [ ] Wrap glassware | doing
+    - id: m3qc
+    - created: 2026-09-20
+`
+	f, problems := Parse(text)
+	if len(problems) != 1 || f.Tasks[0].State != Doing {
+		t.Fatalf("Parse = %v with %v, want the parent Doing and its line flagged", f.Tasks[0].State, problems)
+	}
+	if got := Write(f); got != text {
+		t.Errorf("Write =\n%s\nwant the file as written", got)
+	}
+	f.Tasks[0].Subtasks[0].State = Backlog
+	f.Settle()
+	if got := Write(f); !strings.Contains(got, "- [x] Pack the kitchen | done\n") || !strings.Contains(got, "  - [ ] Wrap glassware | backlog\n") {
+		t.Errorf("Write after a Subtask moved =\n%s\nwant the parent line left as written", got)
 	}
 }
