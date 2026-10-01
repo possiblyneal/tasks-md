@@ -116,7 +116,7 @@ func TestAskAnswersAboutTheTasksInViewAndWritesNothing(t *testing.T) {
 func TestBreakdownProposesWhatTheStoreTakesAndWritesNothing(t *testing.T) {
 	files := map[string]string{"house-move": houseMove}
 	code := homeWith(t, files)
-	told := broker(t, `{"proposals":[{"title":"Sand it","estimate":"90m","priority":"med"},{"title":"Prime it","estimate":"small"}]}`)
+	told := broker(t, `{"proposals":[{"title":"Sand it","estimate":"90m","priority":"med"},{"title":" ","why":"untitled"},{"title":"Prime it","estimate":"small"}]}`)
 	h := Handler(Options{Actor: "neal"})
 
 	w := post(t, h, "/api/breakdown", `{"repo": "house-move", "task": "m3qa", "answers": [{"question": "Which room?", "answer": "Kitchen"}]}`)
@@ -129,8 +129,8 @@ func TestBreakdownProposesWhatTheStoreTakesAndWritesNothing(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &step); err != nil || len(step.Proposals) != 2 {
 		t.Fatalf("POST /api/breakdown answered %s, want two proposals", w.Body.String())
 	}
-	// An estimate the store would refuse is dropped, so a ticked proposal is
-	// written as it was shown.
+	// An estimate the store would refuse is dropped, and so is a proposal with
+	// no title, so a ticked proposal is written as it was shown.
 	if _, ok := step.Proposals[0]["estimate"]; ok || step.Proposals[0]["priority"] != "med" || step.Proposals[1]["estimate"] != "small" {
 		t.Errorf("the proposals came back %v", step.Proposals)
 	}
@@ -144,9 +144,11 @@ func TestBreakdownProposesWhatTheStoreTakesAndWritesNothing(t *testing.T) {
 	if w := post(t, h, "/api/breakdown", `{"repo": "house-move", "task": "zzzz"}`); w.Code != http.StatusNotFound {
 		t.Errorf("breaking down a Task not there answered %d, want 404", w.Code)
 	}
-	broker(t, `{}`)
-	if w := post(t, h, "/api/breakdown", `{"repo": "house-move", "task": "m3qa"}`); w.Code != http.StatusInternalServerError {
-		t.Errorf("a Broker answering nothing answered %d, want 500", w.Code)
+	for _, answer := range []string{`{}`, `{"proposals":[{"title":""}]}`} {
+		broker(t, answer)
+		if w := post(t, h, "/api/breakdown", `{"repo": "house-move", "task": "m3qa"}`); w.Code != http.StatusInternalServerError {
+			t.Errorf("a Broker answering %s answered %d, want 500", answer, w.Code)
+		}
 	}
 }
 

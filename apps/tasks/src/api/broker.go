@@ -139,18 +139,22 @@ func breakdown(o Options, w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	// Neither half is the Broker having answered nothing usable: not this side
-	// failing and not the caller asking wrongly, which is what 500 means here.
-	if len(step.Questions) == 0 && len(step.Proposals) == 0 {
-		fail(w, errors.New("the broker had nothing to ask and nothing to propose"))
-		return
-	}
 	out := struct {
 		Questions []string    `json:"questions,omitempty"`
 		Proposals []write.New `json:"proposals"`
 	}{Questions: step.Questions, Proposals: []write.New{}}
 	for _, p := range step.Proposals {
-		out.Proposals = append(out.Proposals, write.FromProposal(p))
+		// One without a title could never be written, and ticking it would
+		// refuse the whole batch.
+		if n := write.FromProposal(p); n.Title != "" {
+			out.Proposals = append(out.Proposals, n)
+		}
+	}
+	// Neither half is the Broker having answered nothing usable: not this side
+	// failing and not the caller asking wrongly, which is what 500 means here.
+	if len(out.Questions) == 0 && len(out.Proposals) == 0 {
+		fail(w, errors.New("the broker had nothing to ask and nothing to propose"))
+		return
 	}
 	send(w, http.StatusOK, out)
 }
