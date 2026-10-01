@@ -31,12 +31,13 @@ func add(o Options, w http.ResponseWriter, r *http.Request) {
 }
 
 // move is POST /api/tasks/{id}/move: `tasks move` over HTTP, with the body
-// {repo, state, reason?}.
+// {repo, state, reason?, until?}.
 func move(o Options, w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Repo   string `json:"repo"`
 		State  string `json:"state"`
 		Reason string `json:"reason"`
+		Until  string `json:"until"`
 	}
 	dir, err := decode(o, r, &body, &body.Repo)
 	if err != nil {
@@ -44,7 +45,7 @@ func move(o Options, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.PathValue("id")
-	if err := write.Move(dir, o.Actor, id, taskfile.State(body.State), body.Reason); err != nil {
+	if err := write.Move(dir, o.Actor, id, taskfile.State(body.State), body.Reason, body.Until); err != nil {
 		fail(w, err)
 		return
 	}

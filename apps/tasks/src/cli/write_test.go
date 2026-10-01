@@ -212,6 +212,22 @@ func TestAReasonIsHeldOnlyWhileDeferredOrDeclined(t *testing.T) {
 	}
 }
 
+func TestDeferringUntilADateWritesTheDateAndLeavingDeferredClearsIt(t *testing.T) {
+	code := gitHome(t, map[string]string{"house-move": houseMove})
+	repo := filepath.Join(code, "house-move")
+	withRemote(t, repo)
+
+	moving(t, "v9t1", "deferred", "-until", "2026-12-01", "-reason", "after the holidays", "-repo", "house-move")
+	if got := read(t, filepath.Join(repo, "TASKS.md")); !strings.Contains(got, "| deferred\n  - id: v9t1\n") ||
+		!strings.Contains(got, "  - until: 2026-12-01\n") || !strings.Contains(got, "  - reason: after the holidays\n") {
+		t.Errorf("TASKS.md =\n%s\nwant ^v9t1 Deferred until 2026-12-01 with its Reason", got)
+	}
+	moving(t, "v9t1", "backlog", "-repo", "house-move")
+	if got := read(t, filepath.Join(repo, "TASKS.md")); strings.Contains(got, "until:") {
+		t.Errorf("TASKS.md =\n%s\nwant the until date gone with Deferred", got)
+	}
+}
+
 func TestMovesTheRulesTurnAwayChangeNothing(t *testing.T) {
 	code := gitHome(t, map[string]string{"house-move": houseMove})
 	repo := filepath.Join(code, "house-move")
@@ -230,6 +246,8 @@ func TestMovesTheRulesTurnAwayChangeNothing(t *testing.T) {
 		{[]string{"zzzz", "done"}, 1, "no Task has the id zzzz"},
 		{[]string{"v9t1", "finished"}, 2, "not a State"},
 		{[]string{"v9t1", "inbox", "-reason", "why not"}, 2, "Deferred or Declined"},
+		{[]string{"v9t1", "backlog", "-until", "2026-12-01"}, 2, "only while a Task is Deferred"},
+		{[]string{"v9t1", "deferred", "-until", "december"}, 2, "not a date"},
 		{[]string{"v9t1"}, 2, "want an id and a State"},
 	} {
 		status, _, errs := run(t, append(append([]string{"move"}, c.args...), "-repo", "house-move")...)

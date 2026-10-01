@@ -121,18 +121,16 @@ func (n New) check() (taskfile.State, error) {
 	if err := reasonFits(n.Reason, state); err != nil {
 		return "", err
 	}
-	if n.Until != "" && state != taskfile.Deferred {
-		return invalid("until is held only while a Task is Deferred, not %s", title(state))
+	if err := untilFits(n.Until, state); err != nil {
+		return "", err
 	}
 	for _, tag := range n.Tags {
 		if !tagForm.MatchString(tag) {
 			return invalid("%q is not a Tag: one word, with no #, | or space", tag)
 		}
 	}
-	for _, d := range []struct{ name, value string }{{"deadline", n.Deadline}, {"until", n.Until}} {
-		if _, err := time.Parse(time.DateOnly, d.value); d.value != "" && err != nil {
-			return invalid("%s %q is not a date: want YYYY-MM-DD", d.name, d.value)
-		}
+	if err := dated("deadline", n.Deadline); err != nil {
+		return "", err
 	}
 	for _, c := range []struct {
 		name, value string
@@ -155,12 +153,16 @@ func (n New) check() (taskfile.State, error) {
 	return state, nil
 }
 
-// Move puts the Task with the id in another State.
-func Move(dir, actor, id string, to taskfile.State, reason string) error {
+// Move puts the Task with the id in another State. until is the date a move
+// to Deferred is until, or "" for none.
+func Move(dir, actor, id string, to taskfile.State, reason, until string) error {
 	if err := known(to); err != nil {
 		return err
 	}
 	if err := reasonFits(reason, to); err != nil {
+		return err
+	}
+	if err := untilFits(until, to); err != nil {
 		return err
 	}
 	return history.Write(dir, actor, func(before string) (string, string, error) {
@@ -189,9 +191,7 @@ func Move(dir, actor, id string, to taskfile.State, reason string) error {
 		}
 		t.State = to
 		set(t, "reason", reason)
-		if to != taskfile.Deferred {
-			set(t, "until", "")
-		}
+		set(t, "until", until)
 		f.Settle()
 		// The moved Task first, then each parent its move ended or reopened.
 		for i := len(path) - 1; i >= 0; i-- {
@@ -352,6 +352,23 @@ func known(s taskfile.State) error {
 func reasonFits(reason string, s taskfile.State) error {
 	if reason != "" && s != taskfile.Deferred && s != taskfile.Declined {
 		return Invalid{fmt.Errorf("a Reason is held only while a Task is Deferred or Declined, not %s", title(s))}
+	}
+	return nil
+}
+
+// untilFits refuses an until date on any State but Deferred, and one that is
+// not a date.
+func untilFits(until string, s taskfile.State) error {
+	if until != "" && s != taskfile.Deferred {
+		return Invalid{fmt.Errorf("until is held only while a Task is Deferred, not %s", title(s))}
+	}
+	return dated("until", until)
+}
+
+// dated refuses a value that is neither empty nor a date.
+func dated(name, value string) error {
+	if _, err := time.Parse(time.DateOnly, value); value != "" && err != nil {
+		return Invalid{fmt.Errorf("%s %q is not a date: want YYYY-MM-DD", name, value)}
 	}
 	return nil
 }

@@ -59,11 +59,12 @@ func add(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// move is `tasks move <id> <state> [-reason r]`.
+// move is `tasks move <id> <state> [-reason r] [-until date]`.
 func move(args []string, _, stderr io.Writer) int {
 	fs := flags("move", stderr)
 	repo := fs.String("repo", "", "the Repo the Task is in, rather than the one the command is run in")
 	reason := fs.String("reason", "", "why, when the Task is moved to Deferred or Declined")
+	until := fs.String("until", "", "the date it is deferred until, YYYY-MM-DD, when it is moved to Deferred")
 	words, err := parse(fs, args)
 	if err != nil {
 		return 2
@@ -76,7 +77,7 @@ func move(args []string, _, stderr io.Writer) int {
 	if err != nil {
 		return failed("move", err, stderr)
 	}
-	if err := write.Move(dir, actor(), words[0], taskfile.State(words[1]), *reason); err != nil {
+	if err := write.Move(dir, actor(), words[0], taskfile.State(words[1]), *reason, *until); err != nil {
 		return failed("move", err, stderr)
 	}
 	warn("move", dir, stderr)

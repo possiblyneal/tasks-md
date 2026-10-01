@@ -70,6 +70,7 @@ func TestAddAndMoveAnswerWithTheCLIsStatuses(t *testing.T) {
 		status       int
 	}{
 		{"/api/tasks/v9t1/move", `{"repo": "house-move", "state": "doing"}`, http.StatusConflict},
+		{"/api/tasks/v9t1/move", `{"repo": "house-move", "state": "backlog", "until": "2026-12-01"}`, http.StatusBadRequest},
 		{"/api/tasks/m3qa/move", `{"repo": "house-move", "state": "done"}`, http.StatusConflict},
 		{"/api/tasks/zzzz/move", `{"repo": "house-move", "state": "done"}`, http.StatusNotFound},
 		{"/api/tasks/v9t1/move", `{"repo": "nowhere", "state": "done"}`, http.StatusNotFound},
@@ -83,6 +84,13 @@ func TestAddAndMoveAnswerWithTheCLIsStatuses(t *testing.T) {
 		if w.Code != c.status || json.Unmarshal(w.Body.Bytes(), &body) != nil || body.Error == "" {
 			t.Errorf("POST %s %s answered %d %s, want %d with a sentence", c.target, c.body, w.Code, w.Body.String(), c.status)
 		}
+	}
+
+	if w := post(t, h, "/api/tasks/v9t1/move", `{"repo": "house-move", "state": "deferred", "until": "2026-12-01"}`); w.Code != http.StatusOK {
+		t.Fatalf("deferring v9t1 until a date answered %d: %s", w.Code, w.Body.String())
+	}
+	if text, _ := os.ReadFile(filepath.Join(code, "house-move", "TASKS.md")); !strings.Contains(string(text), "  - until: 2026-12-01\n") {
+		t.Errorf("TASKS.md =\n%s\nwant ^v9t1 Deferred until 2026-12-01", text)
 	}
 }
 
