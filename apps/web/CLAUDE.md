@@ -8,10 +8,10 @@ static files that same process serves beside the JSON, so there is no second
 process and no CORS. `docs/adrs/0003-replace-the-tui-with-a-browser-client.md`
 records why the surface moved off the terminal.
 
-What it holds today (#119, #120, #121): the board, six State lanes of
+What it holds today (#119, #120, #121, #124): the board, six State lanes of
 leaf-Task cards over every Repo, drawn from `GET /api/state`, with Repo and Tag
-chips, a search box, a sort picker, a read-only panel a card opens into, and a
-move, by dragging a card to a lane at a desk or holding it on a phone for Move
+chips, a search box, a sort picker, a read-only panel a card opens into, which
+shows a Series' next dates, and a move, by dragging a card to a lane at a desk or holding it on a phone for Move
 to. The box, the add sheet and the breakdown are kept unmounted for #123, which
 brings the Broker routes back; the other writes come with #122.
 
@@ -22,7 +22,7 @@ brings the Broker routes back; the other writes come with #122.
 - `src/state.ts` — the wire shapes and the one read the board makes. It mirrors
   `apps/tasks/src/board/board.go`, which is the side that decides them. It
   holds the Narrowing and `queryString`, the one function that writes it as a
-  query, plus the types the unmounted sheet still reads (`Offered`,
+  query, `fetchSeries`, plus the types the unmounted sheet still reads (`Offered`,
   `Collection`, `Level`) and `GET /api/files`'s shapes.
 - `src/write.ts` — `moveTask`, the one write the board makes, and the calls
   the sheet, the box and the breakdown make. No route answers those until #122
@@ -32,7 +32,9 @@ brings the Broker routes back; the other writes come with #122.
   the click after it stopped at the element.
 - `src/MoveTo.tsx` — Move to, the bottom sheet of six States a held card opens.
 - `src/read.ts` — the guard around a read a screen makes for itself, used by the
-  sheet's file picker.
+  sheet's file picker and the panel's Series.
+- `src/Series.tsx` — a `series:` attribute in the panel: the rule, and the next
+  dates `GET /api/tasks/{id}/series` works out.
 - `src/App.tsx` — the board: the six lanes, the cards, the moves, the
   problems and flags a Repo has, and which panel is open. It is what
   `main.tsx` mounts.
@@ -47,6 +49,7 @@ brings the Broker routes back; the other writes come with #122.
   sheet and the breakdown, unmounted until #123.
 - `src/main.tsx` — the mount, and nothing else.
 - `src/App.test.tsx`, `src/Narrow.test.tsx`, `src/Panel.test.tsx`,
+  `src/Series.test.tsx`,
   `src/Box.test.tsx`, `src/Sheet.test.tsx`, `src/Breakdown.test.tsx` — the
   components with a grammar. `src/testing.ts` is the board fixture and the
   mocked fetch the board's tests share.
@@ -92,7 +95,8 @@ brings the Broker routes back; the other writes come with #122.
   parent, with the parent's State and its leaves per State
   (`Doing 1 · Backlog 2 · Done 3`), and the parent opens its own panel. The
   tree is read from the wide read in file order. A card without an id is not
-  opened.
+  opened. A `series:` attribute shows its rule and the next dates the server
+  works out; the client does no rule arithmetic.
 - **The address names the open panel.** `?task=<id>&repo=<name>` opens one on
   load, since an id is unique only within its Repo; with no `repo` the first
   Repo holding the id is used. Opening and closing replace the address.
@@ -139,8 +143,8 @@ up` or why it refuses writes, as the read carries them in `flags`.
   unrun and reports `unavailable`, which fails the gate.
 - No `public/`: `scripts/structure` reads a folder under a unit that is neither
   `src/` nor a scoped folder as a domain and requires a `src/` inside it.
-- The screens #119 deleted (Series, collections, activity, the log) are in
-  git history for #122 to recover from.
+- The screens #119 deleted (collections, activity, the log) are in git history
+  for #122 to recover from.
 
 ## Verification
 

@@ -6,6 +6,7 @@
 import { Fragment, useEffect } from 'react'
 
 import { Due } from './Due'
+import { Series } from './Series'
 import { type Repo, type State, type Task } from './state'
 
 /** The order the leaf counts are said in: open first, then ended. */
@@ -107,6 +108,8 @@ export function Panel({
               <dd>
                 {a.label === 'deadline' ? (
                   <Due on={a.value} today={today} />
+                ) : a.label === 'series' && task.id ? (
+                  <Series repo={repo.name} id={task.id} rule={a.value} />
                 ) : (
                   a.value
                 )}
