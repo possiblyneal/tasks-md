@@ -42,6 +42,12 @@ export type Task = {
   parents: string[]
   leaf: boolean
   blocked: boolean
+  /**
+   * This Task's place in the whole read's order, across every Repo: by the
+   * sort asked for, then Repo, then place in the file. A lane holds several
+   * Repos' cards and draws them by it.
+   */
+  rank: number
 }
 
 /** One thing wrong with a Repo's tasks.md, at the line it is on. */
@@ -56,10 +62,16 @@ export type Repo = {
   problems: Problem[]
 }
 
-/** A whole read: every Repo, and what was wrong with the config. */
+/**
+ * A whole read: every Repo, what was wrong with the config, the sorts a read
+ * can be ordered by, and the host's local date as `YYYY-MM-DD`, which is the
+ * day a Deadline is today or Overdue against.
+ */
 export type Board = {
   repos: Repo[]
   errors: string[]
+  sorts: string[]
+  today: string
 }
 
 /**
@@ -73,6 +85,8 @@ export type Narrowing = {
   tags: string[]
   search: string
   unblocked: boolean
+  /** One of the served `sorts`; empty is file order. */
+  sort: string
 }
 
 /** Narrowed by nothing: every Task in every Repo. */
@@ -82,12 +96,14 @@ export const WIDE: Narrowing = {
   tags: [],
   search: '',
   unblocked: false,
+  sort: '',
 }
 
 /**
  * A Narrowing as the query string the read carries. An empty value is left
  * out rather than sent empty, so the wide view is the bare path. A set is the
- * parameter repeated, which is how the route reads it.
+ * parameter repeated, which is how the route reads it. File order is what
+ * the read gives with no sort named, so it is left out the same way.
  */
 export function queryString({
   repo,
@@ -95,6 +111,7 @@ export function queryString({
   tags,
   search,
   unblocked,
+  sort,
 }: Narrowing): string {
   const query = new URLSearchParams()
   if (repo) query.set('repo', repo)
@@ -102,6 +119,7 @@ export function queryString({
   for (const tag of tags) query.append('tag', tag)
   if (search) query.set('search', search)
   if (unblocked) query.set('unblocked', 'true')
+  if (sort && sort !== 'file') query.set('sort', sort)
   const written = query.toString()
   return written ? `?${written}` : ''
 }

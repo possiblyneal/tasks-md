@@ -93,10 +93,17 @@ test('each narrowing is sent under the name the route reads it by', () => {
       tags: ['kitchen', 'van'],
       search: '50% off',
       unblocked: true,
+      sort: 'deadline',
     }),
   ).toBe(
-    '?repo=work&state=doing&state=inbox&tag=kitchen&tag=van&search=50%25+off&unblocked=true',
+    '?repo=work&state=doing&state=inbox&tag=kitchen&tag=van&search=50%25+off&unblocked=true&sort=deadline',
   )
+})
+
+// File order is what the read gives when no sort is named, so naming it is a
+// second spelling of the bare path and is left out the way an empty value is.
+test('file order is the bare path', () => {
+  expect(queryString({ ...WIDE, sort: 'file' })).toBe('')
 })
 
 test('the read asks under the narrowing it was given', async () => {

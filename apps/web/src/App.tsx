@@ -1,75 +1,45 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
-import { sentence } from './api'
-import {
-  type Board,
-  fetchState,
-  type Repo,
-  STATES,
-  type Task,
-  WIDE,
-} from './state'
+import { Due } from './Due'
+import { Narrow } from './Narrow'
+import { Panel } from './Panel'
+import { usePoll } from './poll'
+import { queryString, type Repo, STATES, type Task, WIDE } from './state'
 
-// A Repo's tasks.md changing is what says something happened, so this polls
-// once a second over HTTP, and the ETag, hashed over the files' modification
-// times, is what keeps that to a 304 while nothing changes.
-const POLL_MS = 1000
+/** The Task a panel is open on. An id is unique only within its Repo. */
+type Opened = { id: string; repo: string }
 
 /**
  * The board: six State lanes over every Repo, a card per leaf Task. It draws
  * what the read returned and works nothing out for itself: a Task's State,
- * whether it is Blocked and its parents' titles all arrive with it.
+ * whether it is Blocked, its parents' titles and its order all arrive with it.
  *
- * Nothing on it writes. Writes come with #121 and #122, and the box and the
- * breakdown come back with #123.
+ * Two reads are polled. The wide one draws the chips and the panel, which
+ * need every Repo, Tag and parent whatever the lanes are narrowed to; the
+ * narrowed one draws the lanes, and is not made while nothing is narrowed.
  */
 export function App() {
-  const [board, setBoard] = useState<Board | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [narrowing, setNarrowing] = useState(WIDE)
+  const [opened, setOpened] = useState<Opened | null>(linked)
+  const wide = usePoll(WIDE)
+  const narrowed = usePoll(queryString(narrowing) ? narrowing : null)
+  const board = queryString(narrowing) ? narrowed.board : wide.board
+  const error = wide.error ?? narrowed.error
 
-  useEffect(() => {
-    const controller = new AbortController()
-    let etag: string | null = null
+  // The address names the open panel, so a panel can be linked to and a
+  // reload comes back to it.
+  const open = (next: Opened | null) => {
+    setOpened(next)
+    const query = next
+      ? `?${new URLSearchParams({ task: next.id, repo: next.repo })}`
+      : ''
+    window.history.replaceState(null, '', `${window.location.pathname}${query}`)
+  }
 
-    const poll = async () => {
-      try {
-        const snapshot = await fetchState(WIDE, etag, controller.signal)
-        if (controller.signal.aborted) return
-        // A null snapshot is 304: nothing changed, so nothing is redrawn.
-        if (snapshot) {
-          etag = snapshot.etag
-          setBoard(snapshot.board)
-        }
-        setError(null)
-      } catch (caught) {
-        if (controller.signal.aborted) return
-        // The tag described a response this client may no longer hold, so the
-        // next poll asks for the whole thing rather than a 304 against a board
-        // that failed to draw.
-        etag = null
-        setError(sentence(caught))
-      }
-    }
+  const found = opened && wide.board && find(wide.board.repos, opened)
 
-    // Each poll is scheduled once the one before it has settled rather than
-    // on an interval, so two are never in flight together: the slower of an
-    // overlapping pair would draw its older board over the newer one.
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const tick = async () => {
-      await poll()
-      if (!controller.signal.aborted) {
-        timer = setTimeout(() => void tick(), POLL_MS)
-      }
-    }
-
-    void tick()
-    return () => {
-      controller.abort()
-      clearTimeout(timer)
-    }
-  }, [])
-
-  const flagged = board?.repos.filter((repo) => repo.problems.length > 0) ?? []
+  const flagged =
+    wide.board?.repos.filter((repo) => repo.problems.length > 0) ?? []
 
   return (
     <main className="board">
@@ -81,6 +51,13 @@ export function App() {
           {said}
         </p>
       ))}
+      {wide.board && (
+        <Narrow
+          narrowing={narrowing}
+          wide={wide.board}
+          onChange={setNarrowing}
+        />
+      )}
       {flagged.length > 0 && (
         <aside className="problems" aria-label="Problems">
           <h2>Problems</h2>
@@ -97,11 +74,13 @@ export function App() {
       )}
       <div className="lanes">
         {STATES.map((state) => {
-          const cards = (board?.repos ?? []).flatMap((repo) =>
-            repo.tasks
-              .filter((task) => task.leaf && task.state === state)
-              .map((task) => ({ repo, task })),
-          )
+          const cards = (board?.repos ?? [])
+            .flatMap((repo) =>
+              repo.tasks
+                .filter((task) => task.leaf && task.state === state)
+                .map((task) => ({ repo, task })),
+            )
+            .sort((a, b) => a.task.rank - b.task.rank)
           const name = state[0]?.toUpperCase() + state.slice(1)
           return (
             <section className="lane" aria-label={name} key={state}>
@@ -113,21 +92,69 @@ export function App() {
                   key={`${repo.name}:${task.line}`}
                   repo={repo}
                   task={task}
+                  today={board?.today ?? ''}
+                  onOpen={() => open({ id: task.id, repo: repo.name })}
                 />
               ))}
             </section>
           )
         })}
       </div>
+      {opened && wide.board && !found && (
+        <p className="message">
+          {opened.repo
+            ? `No Task ${opened.id} is in ${opened.repo} on the board.`
+            : `No Task ${opened.id} is on the board.`}
+        </p>
+      )}
+      {found && wide.board && (
+        <Panel
+          repo={found.repo}
+          task={found.task}
+          today={wide.board.today}
+          onOpen={(id) => open({ id, repo: found.repo.name })}
+          onClose={() => open(null)}
+        />
+      )}
     </main>
   )
+}
+
+/** The Task a link names: `?task=<id>&repo=<name>`, the Repo optional. */
+function linked(): Opened | null {
+  const query = new URLSearchParams(window.location.search)
+  const id = query.get('task')
+  return id ? { id, repo: query.get('repo') ?? '' } : null
+}
+
+/** The Task opened, in the named Repo, or the first Repo holding the id. */
+function find(
+  repos: Repo[],
+  { id, repo: name }: Opened,
+): { repo: Repo; task: Task } | null {
+  for (const repo of repos) {
+    if (name && repo.name !== name) continue
+    const task = repo.tasks.find((t) => t.id === id)
+    if (task) return { repo, task }
+  }
+  return null
 }
 
 /**
  * One leaf Task. A parent is not a card of its own: its title is drawn above
  * each leaf under it, which is how a nested Task is placed on a flat lane.
  */
-function Card({ repo, task }: { repo: Repo; task: Task }) {
+function Card({
+  repo,
+  task,
+  today,
+  onOpen,
+}: {
+  repo: Repo
+  task: Task
+  today: string
+  onOpen: () => void
+}) {
   const deadline = attr(task, 'deadline')
   const estimate = attr(task, 'estimate')
   return (
@@ -140,13 +167,21 @@ function Card({ repo, task }: { repo: Repo; task: Task }) {
       {task.parents.length > 0 && (
         <small className="parents">{`${task.parents.join(' › ')} ›`}</small>
       )}
-      <span className="card-title">{task.title}</span>
+      {/* Opened by its id, so a hand-typed Task without one, which lint
+          already flags, is not a link. */}
+      {task.id ? (
+        <button type="button" className="card-title" onClick={onOpen}>
+          {task.title}
+        </button>
+      ) : (
+        <span className="card-title">{task.title}</span>
+      )}
       <span className="facts">
         <b className="repo">{repo.name}</b>
         {task.tags.map((tag) => (
           <span key={tag}>#{tag}</span>
         ))}
-        {deadline && <span>due {deadline}</span>}
+        {deadline && <Due on={deadline} today={today} />}
         {estimate && <span>{estimate}</span>}
         {task.blocked && <span className="blocked">blocked</span>}
       </span>
