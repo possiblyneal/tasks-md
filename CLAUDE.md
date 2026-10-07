@@ -1,6 +1,6 @@
 ## What this repository is
 
-`tasks` is a task tracker with two kinds of consumer: a person at a keyboard, and agents that add, edit, and delete while nobody is watching. Both reach the same store through the same calls; neither gets a weaker or a stronger contract than the other. `CONTEXT.md` holds the language that keeps those two from meaning different things by the same word, and `docs/features.md` records the operator's wish list verbatim as source material rather than as a specification.
+`tasks` is a task tracker with two kinds of consumer: a person at a keyboard, and agents that add, edit, and delete while nobody is watching. Both reach the same store through the same calls; neither gets a weaker or a stronger contract than the other. `GLOSSARY.md` holds the language that keeps those two from meaning different things by the same word, and `docs/features.md` records the operator's wish list verbatim as source material rather than as a specification.
 
 The repository holds **two deployables**. Three bounded contexts — Tracking, Scheduling, Change History — collapse into a single Go binary, `apps/tasks`, with three modes: bare `tasks` prints usage, `tasks <verb>` acts and exits, and `tasks api` serves the JSON the browser client reads. `apps/web` is that client, and it builds to static files `tasks api` serves beside the JSON. The store is a `TASKS.md` file in each Repo, a folder directly inside a configured root (`docs/adrs/0004-tasks-md-is-the-store.md`), so it is not a deployable of its own.
 
@@ -22,7 +22,7 @@ The node checks dispatch off the root `package.json`'s scripts — `lint`, `form
 
 ## Commands
 
-Located at `./scripts` Use these instead of per-language tools; each detects the languages present and fails when an expected check cannot run. `./scripts/CLAUDE.md` documents all of them.
+Located at `./scripts` Use these instead of per-language tools; each detects the languages present and fails when an expected check cannot run.
 
 ## Git
 
@@ -45,7 +45,7 @@ The seven canonical roles, unrenamed. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` at the root, ADRs in `docs/adrs/`. See `docs/agents/domain.md`.
+Single-context: `GLOSSARY.md` at the root, ADRs in `docs/adrs/`. See `docs/agents/domain.md`.
 
 ### Session launcher
 
@@ -53,7 +53,6 @@ Orca, on this machine. See `docs/agents/session-launcher.md`.
 
 ## Child Index
 
-- `scripts/CLAUDE.md` — the language-capabilities interface, the result states, the test harness, and what adding a language or check requires
 - `apps/tasks/CLAUDE.md` — the Go deployable: its package layout, the store's enforced rules, and what each mode owns
 - `apps/web/CLAUDE.md` — the browser client: what it draws, what it refuses to work out for itself, and the npm scripts the checks dispatch on
 
