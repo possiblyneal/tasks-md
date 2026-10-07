@@ -194,7 +194,7 @@ repos:
   # The remaining low findings are artipacked, which wants persist-credentials:
   # false on every checkout. Dropping to low means setting that on each one.
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.30.0
+    rev: v1.30.1
     hooks:
       - id: zizmor
         args: ["--no-progress", "--config", ".github/zizmor.yml", "--min-severity", "medium"]
@@ -203,8 +203,15 @@ repos:
     rev: v6.0.0
     hooks:
       - id: check-merge-conflict
+      # A unified diff writes a blank context line as a single space, so
+      # stripping it, or the blank lines a patch ends on, makes `git apply`
+      # reject the patch. A patch is reproduced byte for byte, never tidied:
+      # mixed-line-ending below excludes it too, since a patch against a CRLF
+      # file carries LF headers and CRLF content.
       - id: end-of-file-fixer
+        exclude: \.(patch|diff)$
       - id: trailing-whitespace
+        exclude: \.(patch|diff)$
       - id: check-yaml
       # devcontainer.json is JSON with comments by specification -- the dev
       # container schema sets allowComments -- and the file ships with its
@@ -248,6 +255,7 @@ repos:
       # Enforces the LF rule in .gitattributes at commit time. Defaults to
       # rewriting to the majority ending in the file.
       - id: mixed-line-ending
+        exclude: \.(patch|diff)$
 
       # Keeps main reviewable: work lands through a pull request, where the
       # template and CODEOWNERS apply, rather than as a direct commit.
@@ -261,13 +269,15 @@ repos:
   # Rules live in .commitlintrc.yaml. commitlint refuses to lint at all without
   # a config naming a shared preset, so that file is required, not optional.
   #
-  # @commitlint/config-conventional is pinned and has to be bumped by hand:
-  # Dependabot's pre-commit ecosystem updates `rev` and never reads
-  # additional_dependencies, so an unpinned entry silently follows whatever npm
-  # serves that day and a commit rule can change without a diff.
+  # @commitlint/config-conventional is pinned to an exact version, because an
+  # entry naming no version follows whatever npm serves the day a hook
+  # environment is built, and a commit rule would change with no diff. The pin
+  # is not bumped by hand: Dependabot's pre-commit ecosystem reads
+  # additional_dependencies and raises the bump alongside `rev`, but only
+  # because a version is written there for it to read.
   - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
-    rev: v9.26.0
+    rev: v9.27.0
     hooks:
       - id: commitlint
         stages: [commit-msg]
-        additional_dependencies: ["@commitlint/config-conventional@21.2.2"]
+        additional_dependencies: ["@commitlint/config-conventional@21.2.3"]

@@ -18,7 +18,11 @@ concurrency:
 jobs:
   ci:
     name: CI
-    runs-on: ubuntu-latest
+    # Hosted by default. A repository that sets a `RUNNER` variable runs this
+    # job on its own machine instead, and must leave it unset while it is
+    # public: a self-hosted runner there lets any fork's pull request run
+    # arbitrary code on the host.
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -44,10 +48,7 @@ jobs:
       # Before the toolchains, since these install none and verify both the
       # language-capabilities wiring and the local/hosted check boundary.
       - name: Verify repository scripts
-        run: |
-          for test_script in scripts/tests/*-test; do
-            "$test_script"
-          done
+        run: scripts/script-tests
 
       # The hook receives the same base-to-head file range a push does. It
       # validates an edited changelog but deliberately does not require one for

@@ -18,7 +18,11 @@ concurrency:
 jobs:
   security:
     name: Security
-    runs-on: ubuntu-latest
+    # Hosted by default. A repository that sets a `RUNNER` variable runs this
+    # job on its own machine instead, and must leave it unset while it is
+    # public: a self-hosted runner there lets any fork's pull request run
+    # arbitrary code on the host.
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -44,7 +48,7 @@ jobs:
 
       - name: Set up Python
         if: steps.detect.outputs.python == 'true'
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
 
@@ -54,7 +58,8 @@ jobs:
         with:
           go-version: stable
 
-      # Both float rather than pinning, unlike the action versions above.
+      # govulncheck and cargo-audit both float rather than pinning, unlike the
+      # action versions above.
       # Dependabot reads no version out of a run step, so a pin here is one
       # nothing upgrades: it would hold whatever release was current the day
       # this file was written and go stale in every repository cloned from the
@@ -65,9 +70,25 @@ jobs:
         if: steps.detect.outputs.go == 'true'
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
+      # +stable rather than bare cargo: this runs in the workspace, so a root
+      # rust-toolchain.toml applies as a rustup directory override and would
+      # build the auditor with the product's pinned toolchain. A floating
+      # cargo-audit raises its own MSRV, so that pin eventually sits below it
+      # and the install fails. The audit tool's toolchain is not the product's.
+      # +stable is rustup's syntax, not cargo's, so this assumes rustup rather
+      # than a distribution cargo. That holds on ubuntu-latest; a self-hosted
+      # host may have no rustup at all, where a bare `cargo +stable` fails on
+      # an unknown subcommand and says nothing about the machine. The guard is
+      # the same one .github/actions/setup-toolchains makes, repeated because
+      # this job sets up its toolchains inline rather than through that action.
       - name: Install cargo-audit
         if: steps.detect.outputs.rust == 'true'
-        run: cargo install cargo-audit --locked
+        run: |
+          if ! command -v rustup > /dev/null 2>&1; then
+            echo "::error::rustup is not on this runner. A GitHub-hosted image ships it; a self-hosted host must install it for the runner user before a Rust repository can be audited here."
+            exit 1
+          fi
+          cargo +stable install cargo-audit --locked
 
       - name: Install trivy
         if: steps.detect.outputs.trivy == 'true'

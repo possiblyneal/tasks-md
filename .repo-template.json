@@ -3,15 +3,14 @@
   "template": {
     "repository": "https://github.com/possiblyneal/template",
     "subtree": "apps/github-repository-template/src/base-repo",
-    "commit": "ebb0483bb431ac6b8e9b9809823296c484e2d4f3"
+    "commit": "5801f43adb247ad42b470b6108f5c3a19a1c3d37"
   },
   "destination": {
-    "repository": "possiblyneal/todo",
+    "repository": "possiblyneal/tasks-md",
     "default_branch": "main"
   },
   "generation": {
     "applications": ["tasks"],
-    "visibility": "public",
     "features": {}
   },
   "ownership": [
