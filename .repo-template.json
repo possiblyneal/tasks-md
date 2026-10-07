@@ -6,7 +6,7 @@
     "commit": "ebb0483bb431ac6b8e9b9809823296c484e2d4f3"
   },
   "destination": {
-    "repository": "possiblyneal/todo",
+    "repository": "possiblyneal/tasks-md",
     "default_branch": "main"
   },
   "generation": {
