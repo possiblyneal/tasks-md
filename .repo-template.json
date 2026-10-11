@@ -3,10 +3,10 @@
   "template": {
     "repository": "https://github.com/possiblyneal/template",
     "subtree": "apps/github-repository-template/src/base-repo",
-    "commit": "ebb0483bb431ac6b8e9b9809823296c484e2d4f3"
+    "commit": "6809db66d585abe316433e7c16fbca8204177f92"
   },
   "destination": {
-    "repository": "possiblyneal/todo",
+    "repository": "possiblyneal/tasks-md",
     "default_branch": "main"
   },
   "generation": {
@@ -27,9 +27,7 @@
     {"path": ".claude/settings.json", "mode": "managed"},
     {"path": ".github/**", "mode": "managed"},
     {"path": "scripts/**", "mode": "managed"},
-    {"path": "docs/agents/**", "mode": "managed"},
     {"path": "docs/adrs/0000-template.md", "mode": "managed"},
-    {"path": "docs/agents/session-launcher.md", "mode": "product"},
     {"path": "docs/LESSONS.md", "mode": "managed"},
     {"path": "apps/**", "mode": "product"},
     {"path": "libs/**", "mode": "product"},

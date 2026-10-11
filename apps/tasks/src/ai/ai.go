@@ -1,7 +1,7 @@
 // Package ai talks to the broker: an outbound OpenAI-compatible HTTP call to
 // inference-runtime-broker, which already runs on the LAN. The broker is what
 // infers; nothing in this repository does, and the word is deliberately not
-// Agent, which CONTEXT.md gives to an Actor that writes.
+// Agent, which GLOSSARY.md gives to an Actor that writes.
 //
 // Nothing is inferred in this process and nothing durable is left here. A
 // breakdown is a conversation that produces proposals; a proposal is a value
