@@ -35,17 +35,7 @@ Located at `./scripts` Use these instead of per-language tools; each detects the
 
 ## Agent skills
 
-### Issue tracker
-
-GitHub Issues on `possiblyneal/todo`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-The seven canonical roles, unrenamed. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context: `CONTEXT.md` at the root, ADRs in `docs/adrs/`. See `docs/agents/domain.md`.
+The engineering skills (`/wayfinder`, `/triage`, `/ship`) carry the GitHub Issues, `gh`, and seven-role label defaults. A repository that differs records a departure in `.repo-template.json` `generation.features`; this repository records none. Its glossary is `CONTEXT.md` at the root rather than `GLOSSARY.md`; ADRs are in `docs/adrs/`.
 
 ### Session launcher
 
