@@ -71,17 +71,9 @@ There is a root manifest per toolchain, and each is what makes its nested packag
 
 The node checks dispatch off the root `package.json`'s scripts — `lint`, `format:check`, `format`, `typecheck`, `test`, `build` — each delegating to `apps/web`. A missing script reports `unavailable`, which fails the gate the same way a failure does, so renaming one here is renaming a check. `dev` is the seventh script and the one no check reads: it is there so the client's dev server starts from the root the other six run from.
 
-### Issue tracker
+### Agent skills
 
-GitHub Issues on `possiblyneal/tasks-md`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-The seven canonical roles, unrenamed. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context: `GLOSSARY.md` at the root, ADRs in `docs/adrs/`. See `docs/agents/domain.md`.
+The engineering skills (`/wayfinder`, `/triage`, `/ship`) carry the GitHub Issues, `gh`, and seven-role label defaults. A repository that differs records a departure in `.repo-template.json` `generation.features`; this repository records none. ADRs are in `docs/adrs/`.
 
 ### Session launcher
 

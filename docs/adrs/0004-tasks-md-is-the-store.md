@@ -69,7 +69,7 @@ thing that prevented all three.
   parent may complete while its Subtasks are open has to be decided again, as a
   rule of the file.
 - A Task can no longer sit in two Lists. Cross-cutting grouping is left to Tags.
-- `GLOSSARY.md` terms that assume a single store change: List becomes Repo, and
+- `CONTEXT.md` terms that assume a single store change: List becomes Repo, and
   Lease, Change History and Actor are redefined. Each term is rewritten when the
   map ticket that settles it closes.
 - A direct edit bypasses the stale-write refusal, so a rare clash between a

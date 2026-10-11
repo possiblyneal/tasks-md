@@ -8,12 +8,12 @@ show the Task it is about, and if the log can be searched past its first page.
 
 "Show everything" takes in the snoozed, the completed, the declined and the
 deleted together, so a Task that should not have been there sits beside three
-kinds of Task that were meant to be. `GLOSSARY.md` already says a deletion is the
+kinds of Task that were meant to be. `CONTEXT.md` already says a deletion is the
 one thing there is no way back from; putting it in a view of the ended says the
 opposite.
 
 Offering **Deleted** as an entry in the List picker was considered and dropped.
-`GLOSSARY.md` defines a List as where the work sits and lets a Task belong to
+`CONTEXT.md` defines a List as where the work sits and lets a Task belong to
 more than one, so a deleted Task would still sit under its real Lists as well —
 the picker would either double-file it or lose where it sat.
 
@@ -67,4 +67,4 @@ about a Task find the entries about it.
 3. CLI: `-all` stops taking in the deleted.
 4. Client: the search box on the activity screen, and an entry that opens the
    Task as it stood.
-5. Docs: `GLOSSARY.md`'s **Deleted** term, and both child `CLAUDE.md` files.
+5. Docs: `CONTEXT.md`'s **Deleted** term, and both child `CLAUDE.md` files.

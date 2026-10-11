@@ -97,7 +97,7 @@ each one who did it, what they did and when. That last part is the reason the
 Change History is append-only made visible, and it is where an Agent's unattended
 writes show up as somebody's writes rather than as changes that merely appeared.
 
-The who is two halves, on the terms `GLOSSARY.md` sets out under **Actor**. The
+The who is two halves, on the terms `CONTEXT.md` sets out under **Actor**. The
 client splits on the first slash so the log says that Opus completed this one and
 Fable added that one, and which agent each was acting as, and it draws the raw
 string whenever there is no slash. It recognises no model by name and judges
@@ -114,7 +114,7 @@ bracket every guarded write under the writer's own Actor, so the screen drops th
 kinds or it is two thirds plumbing. The
 filter narrows and never hides: the screen opens unfiltered, and an Agent that
 named itself with no slash — one run with no `TODO_ACTOR`, or anything appended
-before the convention existed — is in that view. `GLOSSARY.md` makes such an Actor
+before the convention existed — is in that view. `CONTEXT.md` makes such an Actor
 legal, so a screen that only ever showed slashes would be the one place a badly
 named Agent disappears.
 
