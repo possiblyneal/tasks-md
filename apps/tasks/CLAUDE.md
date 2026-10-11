@@ -78,7 +78,7 @@ It reads through `list`, `repos`, `lint`, `stats` and `GET /api/state`, and writ
 - A write test gives its home a `.gitconfig` with a user and sets `GIT_CONFIG_NOSYSTEM=1`, so commits never depend on the machine's git config.
 - A test owns its home: set `HOME` and `XDG_CONFIG_HOME` to a temp directory so discovery never reads the real `~/code`.
 - The broker is shared and its chat model is large: a 429 saying `scheduler_busy` means the GPU budget is spoken for. Tests stand a broker in with `httptest` and never reach the LAN.
-- The exported vocabulary is `CONTEXT.md`'s: Repo, Task, Subtask, State, Tag, Blocked, Series, Occurrence, Actor.
+- The exported vocabulary is `GLOSSARY.md`'s: Repo, Task, Subtask, State, Tag, Blocked, Series, Occurrence, Actor.
 
 ## Verification
 

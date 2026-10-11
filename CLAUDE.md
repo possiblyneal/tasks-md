@@ -1,6 +1,53 @@
-## What this repository is
+## Template Contract
 
-`tasks` is a task tracker with two kinds of consumer: a person at a keyboard, and agents that add, edit, and delete while nobody is watching. Both reach the same store through the same calls; neither gets a weaker or a stronger contract than the other. `CONTEXT.md` holds the language that keeps those two from meaning different things by the same word, and `docs/features.md` records the operator's wish list verbatim as source material rather than as a specification.
+These sections are identical in every repository built from the template. Do not edit them here: a repository whose shape needs to differ has found a gap in the template, so fix it there and let the next template update (`/repo-builder`) carry it. This repository's own instructions start at Purpose.
+
+### Commands
+
+Use these instead of per-language tools. `check` and `fix` run for every language present and report `pass`, `not-applicable`, `unavailable`, or `FAIL`.
+
+- `scripts/check` — the full local gate, a superset of CI except the pull request's changelog check: doctor, script tests, structure, lint, format, type check, test, build, security audit, pre-commit over every file. Prints only the Result table, with the full run in `tmp/check.log`; `--verbose` streams everything
+- `scripts/fix` — lint autofix, then formatting
+- `scripts/summarize <command…>` — run a check and print only its Result table; read `ci` and other commands through this, since `check` already does
+- `scripts/run [unit] [--entry <name>] [-- args…]` — start a unit; the unit name is required when `apps/` holds several
+
+`ls scripts/` lists the rest, such as `doctor`, `integration`, and `package`.
+
+### Layout
+
+`scripts/check` fails on any of these; pre-commit runs `scripts/structure` over the placement rules on every commit.
+
+- Root holds only `apps/`, `docs/`, `libs/`, `scripts/`, `tests/`, `tools/`, `deploy/`, `assets/`, `gradle/`, `tmp/`, and the dot-folders `.claude/`, `.github/`, `.devcontainer/`.
+- Root files are permitted by name: the shipped dotfiles, `CLAUDE.md`, `GLOSSARY.md`, `GLOSSARY-MAP.md`, `.gitmodules`, `.structure-allow`, `.repo-template.json`, adopted addons, and each language's root manifests and lockfiles. Any other root file or folder needs an entry in `.structure-allow`.
+- `apps/<unit>/` is one unit: the smallest piece delivered on its own. Its code goes in `apps/<unit>/src/`. Nothing sits directly in `apps/`.
+- Split a unit into domains only for distinct business areas: `apps/<unit>/<domain>/src/`. A unit has `src/` or domains, never both. Domains do not nest.
+- A root, unit, or domain may hold its own `libs/`, `tests/`, `scripts/`, `tools/`, `assets/`, `docs/`, or `deploy/`, scoped to it. These never contain `src/`.
+- `tools/` holds one directory per program, never loose files.
+- `deploy/` holds only `quadlet/`, `containerfile/`, `compose/`, `systemd/`, and `env/`.
+- `docs/` takes Markdown; anything else there needs `.structure-allow`.
+- Below a `src/`, the language decides the layout.
+- A path ending in `/` in `.structure-allow` exempts that whole prefix, for vendored or fixture trees.
+- A package whose language has no root manifest fails the gate; add the root workspace manifest (`go.work`, `settings.gradle.kts`, and so on) that lists it. Swift is excepted: it has no root manifest.
+
+These are conventions `scripts/structure` does not check:
+
+- Root-level `libs/`, `tests/`, `scripts/`, `tools/`, `deploy/`, and `assets/` hold only what spans several units.
+- Files a program reads go in `assets/`. Files it writes while running go in `apps/<unit>/state/`, which is gitignored.
+- `tests/integration/` is the integration tier, run by `scripts/integration` and left out of the gate.
+
+Every unit has a `.unit.json` at its root, never at a domain's:
+
+```json
+{ "schema_version": 1, "run": "oneshot", "ships": { "kind": "executable", "targets": ["linux-amd64"] } }
+```
+
+- `run`: `oneshot` (exits on its own), `longlived` (runs until stopped), or `none`.
+- `ships.kind`: `executable`, `quadlet`, or `none`. `ships.targets` (`linux-amd64`, `macos-arm64`) is required for `executable` and rejected otherwise.
+- Any pairing of `run` and `ships` is valid.
+
+## Purpose
+
+`tasks` is a task tracker with two kinds of consumer: a person at a keyboard, and agents that add, edit, and delete while nobody is watching. Both reach the same store through the same calls; neither gets a weaker or a stronger contract than the other. `GLOSSARY.md` holds the language that keeps those two from meaning different things by the same word, and `docs/features.md` records the operator's wish list verbatim as source material rather than as a specification.
 
 The repository holds **two deployables**. Three bounded contexts — Tracking, Scheduling, Change History — collapse into a single Go binary, `apps/tasks`, with three modes: bare `tasks` prints usage, `tasks <verb>` acts and exits, and `tasks api` serves the JSON the browser client reads. `apps/web` is that client, and it builds to static files `tasks api` serves beside the JSON. The store is a `TASKS.md` file in each Repo, a folder directly inside a configured root (`docs/adrs/0004-tasks-md-is-the-store.md`), so it is not a deployable of its own.
 
@@ -16,28 +63,17 @@ Those three are first-class, and a surface that reaches them in fewer taps than 
 
 **The list is the one thing the Broker does not own.** A person browses it, filters it, sorts it and searches it themselves, and opens a Task to see its detail and what has happened to it. That part is looked at rather than spoken to, and it stays that way.
 
+## Ownership
+
+## Local Contracts
+
 There is a root manifest per toolchain, and each is what makes its nested package visible to every check: `go.work` for the module under `apps/tasks/`, and `package.json` naming `apps/web` as an npm workspace. A nested manifest with no root one above it is an orphan `scripts/doctor` fails on rather than passing over, so a new package gets its root entry in the same commit that creates it.
 
 The node checks dispatch off the root `package.json`'s scripts — `lint`, `format:check`, `format`, `typecheck`, `test`, `build` — each delegating to `apps/web`. A missing script reports `unavailable`, which fails the gate the same way a failure does, so renaming one here is renaming a check. `dev` is the seventh script and the one no check reads: it is there so the client's dev server starts from the root the other six run from.
 
-## Commands
-
-Located at `./scripts` Use these instead of per-language tools; each detects the languages present and fails when an expected check cannot run. `./scripts/CLAUDE.md` documents all of them.
-
-## Git
-
-- Pre-commit blocks direct commits to `main` and `master`. Branch before making changes.
-- Run `scripts/check` before committing. It runs the same checks CI does, plus pre-commit across every file rather than the staged ones.
-- Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/#specification), and carry a `Generated-By: <model>` trailer. `scripts/attribute-commit` writes it at `prepare-commit-msg` by rewriting an agent's `Co-Authored-By` line; it never inserts one, so a message with no agent trailer is refused and a hand-written commit adds its own.
-- This repo adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-- Pull requests merge; they are neither squashed nor rebased.
-- Plan mode writes to `docs/plans/`, which is tracked. A plan lands in the diff alongside the code it describes.
-
-## Agent skills
-
 ### Issue tracker
 
-GitHub Issues on `possiblyneal/todo`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+GitHub Issues on `possiblyneal/tasks-md`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
@@ -45,15 +81,18 @@ The seven canonical roles, unrenamed. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` at the root, ADRs in `docs/adrs/`. See `docs/agents/domain.md`.
+Single-context: `GLOSSARY.md` at the root, ADRs in `docs/adrs/`. See `docs/agents/domain.md`.
 
 ### Session launcher
 
 Orca, on this machine. See `docs/agents/session-launcher.md`.
 
+## Work Guidance
+
+## Verification
+
 ## Child Index
 
-- `scripts/CLAUDE.md` — the language-capabilities interface, the result states, the test harness, and what adding a language or check requires
 - `apps/tasks/CLAUDE.md` — the Go deployable: its package layout, the store's enforced rules, and what each mode owns
 - `apps/web/CLAUDE.md` — the browser client: what it draws, what it refuses to work out for itself, and the npm scripts the checks dispatch on
 

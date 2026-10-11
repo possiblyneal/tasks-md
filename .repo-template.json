@@ -3,7 +3,7 @@
   "template": {
     "repository": "https://github.com/possiblyneal/template",
     "subtree": "apps/github-repository-template/src/base-repo",
-    "commit": "ebb0483bb431ac6b8e9b9809823296c484e2d4f3"
+    "commit": "6809db66d585abe316433e7c16fbca8204177f92"
   },
   "destination": {
     "repository": "possiblyneal/tasks-md",

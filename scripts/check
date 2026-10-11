@@ -1,8 +1,41 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# The full local gate, in the order below. Local means it reads no hosted
+# GitHub state, not that it stays offline: commitlint-test and pre-commit's own
+# hook environments fetch on first use.
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
+
+# By default only the Result table reaches the caller, because the rest of the
+# run -- pre-commit's hook list, test progress, compiler noise -- is what an
+# agent would otherwise read to learn what the table already says. The filter is
+# scripts/summarize rather than a second one here: check runs itself under it
+# with --verbose, so the raw run still exists, and the exit status is the
+# gate's because summarize passes its command's through.
+#
+# The full run is written to tmp/check.log every time, passing or failing. A
+# pre-commit fixer repairs the file and exits non-zero, so a re-run passes and
+# the cause is gone; the log is what a failure outside the table is diagnosed
+# from. --verbose streams the same text live. --gate is the internal entry that
+# runs the steps below and nothing else, so the tee wraps exactly one run.
+case "${1:-}" in
+  "")
+    exec scripts/summarize scripts/check --verbose
+    ;;
+  --verbose)
+    mkdir -p tmp
+    # pipefail (set above) makes the pipeline's status the gate's, not tee's.
+    scripts/check --gate 2>&1 | tee tmp/check.log
+    exit "${PIPESTATUS[0]}"
+    ;;
+  --gate) ;;
+  *)
+    echo "usage: scripts/check [--verbose]" >&2
+    exit 2
+    ;;
+esac
 
 if [[ ! -x scripts/doctor ]]; then
   echo "scripts/doctor is missing or not executable."
@@ -13,27 +46,12 @@ scripts/doctor
 
 # Run before the checks they guard. They verify the language-capabilities
 # interface, its workflow adapters, and that routine local commands stay offline.
-#
-# nullglob so an empty scripts/tests/ reports itself plainly rather than the
-# unexpanded glob reading as one missing, non-executable test script.
-shopt -s nullglob
-test_scripts=(scripts/tests/*-test)
-shopt -u nullglob
-if (( ${#test_scripts[@]} == 0 )); then
-  echo "No test scripts found in scripts/tests/."
+if [[ ! -x scripts/script-tests ]]; then
+  echo "scripts/script-tests is missing or not executable."
   exit 1
 fi
-for test_script in "${test_scripts[@]}"; do
-  if [[ ! -x "$test_script" ]]; then
-    echo "$test_script is missing or not executable."
-    exit 1
-  fi
-  # Closed for the same reason libs/detect.sh closes it for a capability: a
-  # child that drains fd 0 blocks until the caller's stdin reaches EOF, which
-  # for a terminal or an agent harness is never, and the gate hangs with
-  # nothing printed. Nothing check runs is interactive.
-  "$test_script" </dev/null
-done
+
+scripts/script-tests
 
 # Where a file sits, checked before what is in it. A misplaced file passes every
 # language check in this repository, because each one reads the manifests and
