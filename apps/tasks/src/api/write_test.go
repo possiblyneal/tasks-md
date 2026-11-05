@@ -70,7 +70,7 @@ func TestAddAndMoveAnswerWithTheCLIsStatuses(t *testing.T) {
 		status       int
 	}{
 		{"/api/tasks/v9t1/move", `{"repo": "house-move", "state": "doing"}`, http.StatusConflict},
-		{"/api/tasks/v9t1/move", `{"repo": "house-move", "state": "backlog", "until": "2026-12-01"}`, http.StatusBadRequest},
+		{"/api/tasks/v9t1/move", `{"repo": "house-move", "state": "backlog", "until": "2099-12-01"}`, http.StatusBadRequest},
 		{"/api/tasks/m3qa/move", `{"repo": "house-move", "state": "done"}`, http.StatusConflict},
 		{"/api/tasks/zzzz/move", `{"repo": "house-move", "state": "done"}`, http.StatusNotFound},
 		{"/api/tasks/v9t1/move", `{"repo": "nowhere", "state": "done"}`, http.StatusNotFound},
@@ -86,11 +86,11 @@ func TestAddAndMoveAnswerWithTheCLIsStatuses(t *testing.T) {
 		}
 	}
 
-	if w := post(t, h, "/api/tasks/v9t1/move", `{"repo": "house-move", "state": "deferred", "until": "2026-12-01"}`); w.Code != http.StatusOK {
+	if w := post(t, h, "/api/tasks/v9t1/move", `{"repo": "house-move", "state": "deferred", "until": "2099-12-01"}`); w.Code != http.StatusOK {
 		t.Fatalf("deferring v9t1 until a date answered %d: %s", w.Code, w.Body.String())
 	}
-	if text, _ := os.ReadFile(filepath.Join(code, "house-move", "TASKS.md")); !strings.Contains(string(text), "  - until: 2026-12-01\n") {
-		t.Errorf("TASKS.md =\n%s\nwant ^v9t1 Deferred until 2026-12-01", text)
+	if text, _ := os.ReadFile(filepath.Join(code, "house-move", "TASKS.md")); !strings.Contains(string(text), "  - until: 2099-12-01\n") {
+		t.Errorf("TASKS.md =\n%s\nwant ^v9t1 Deferred until 2099-12-01", text)
 	}
 }
 
@@ -116,17 +116,17 @@ func TestEveryAttributeRoundTripsThroughAddAndEdit(t *testing.T) {
 
 	w := post(t, h, "/api/tasks", `{"repo": "house-move", "title": "Paint the hall", "state": "deferred",
 		"tags": ["paint"], "description": "Two coats.", "why": "it is scuffed", "acceptance": "no marks",
-		"deadline": "2026-12-01", "priority": "high", "impact": "low", "estimate": "large", "color": "red",
-		"blockedBy": ["v9t1"], "reason": "after the move", "until": "2026-11-01", "attach": ["~/paint.pdf"]}`)
+		"deadline": "2099-12-01", "priority": "high", "impact": "low", "estimate": "large", "color": "red",
+		"blockedBy": ["v9t1"], "reason": "after the move", "until": "2099-11-01", "attach": ["~/paint.pdf"]}`)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("POST /api/tasks answered %d: %s", w.Code, w.Body.String())
 	}
 	var added struct{ ID string }
 	_ = json.Unmarshal(w.Body.Bytes(), &added)
 	want := []taskfile.Attr{
-		{Label: "deadline", Value: "2026-12-01"}, {Label: "priority", Value: "high"}, {Label: "impact", Value: "low"},
+		{Label: "deadline", Value: "2099-12-01"}, {Label: "priority", Value: "high"}, {Label: "impact", Value: "low"},
 		{Label: "estimate", Value: "large"}, {Label: "color", Value: "red"}, {Label: "why", Value: "it is scuffed"},
-		{Label: "acceptance", Value: "no marks"}, {Label: "blocked by", Value: "v9t1"}, {Label: "until", Value: "2026-11-01"},
+		{Label: "acceptance", Value: "no marks"}, {Label: "blocked by", Value: "v9t1"}, {Label: "until", Value: "2099-11-01"},
 		{Label: "reason", Value: "after the move"}, {Label: "attachment", Value: "~/paint.pdf"},
 	}
 	got := task(t, h, "house-move", added.ID)
@@ -137,14 +137,14 @@ func TestEveryAttributeRoundTripsThroughAddAndEdit(t *testing.T) {
 	w = post(t, h, "/api/tasks/"+added.ID, `{"repo": "house-move", "version": "`+got.Version+`", "title": "Paint the stairs",
 		"tags": ["paint", "stairs"], "description": "One coat.", "why": "", "acceptance": "even", "deadline": "2027-01-01",
 		"priority": "low", "impact": "high", "estimate": "small", "color": "blue", "blockedBy": [], "reason": "later",
-		"until": "2026-11-02", "attach": ["~/stairs.pdf"], "detach": ["~/paint.pdf"]}`)
+		"until": "2099-11-02", "attach": ["~/stairs.pdf"], "detach": ["~/paint.pdf"]}`)
 	if w.Code != http.StatusOK {
 		t.Fatalf("POST /api/tasks/%s answered %d: %s", added.ID, w.Code, w.Body.String())
 	}
 	want = []taskfile.Attr{
 		{Label: "deadline", Value: "2027-01-01"}, {Label: "priority", Value: "low"}, {Label: "impact", Value: "high"},
 		{Label: "estimate", Value: "small"}, {Label: "color", Value: "blue"}, {Label: "acceptance", Value: "even"},
-		{Label: "until", Value: "2026-11-02"}, {Label: "reason", Value: "later"}, {Label: "attachment", Value: "~/stairs.pdf"},
+		{Label: "until", Value: "2099-11-02"}, {Label: "reason", Value: "later"}, {Label: "attachment", Value: "~/stairs.pdf"},
 	}
 	got = task(t, h, "house-move", added.ID)
 	if !slices.Equal(got.Attrs, want) || got.Title != "Paint the stairs" || got.Description != "One coat." || !slices.Equal(got.Tags, []string{"paint", "stairs"}) {

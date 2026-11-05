@@ -1,7 +1,9 @@
 {
   "name": "tasks",
   "private": true,
-  "workspaces": ["apps/web"],
+  "workspaces": [
+    "apps/web"
+  ],
   "scripts": {
     "lint": "npm run lint -w apps/web",
     "format": "npm run format -w apps/web",
@@ -10,5 +12,8 @@
     "test": "npm run test -w apps/web",
     "build": "npm run build -w apps/web",
     "dev": "npm run dev -w apps/web"
+  },
+  "overrides": {
+    "minimatch": "^11.0.1"
   }
 }
