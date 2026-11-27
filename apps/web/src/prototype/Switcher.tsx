@@ -1,4 +1,4 @@
-// PROTOTYPE — throwaway. Floating variant switcher for issue #99.
+// PROTOTYPE — throwaway. Floating variant switcher for issues #99 and #109.
 import { useEffect } from 'react'
 
 export function Switcher({

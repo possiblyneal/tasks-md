@@ -1,5 +1,5 @@
 // PROTOTYPE — throwaway. Stub Tasks across four Repos for the all-Repos page
-// prototype (issue #99). Nothing here reaches the API; moves live in memory.
+// prototype (issues #99 and #109). Nothing here reaches the API; moves live in memory.
 
 export const STATES = [
   'Inbox',
